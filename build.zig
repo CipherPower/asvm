@@ -61,16 +61,27 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    // TESTS:
+    // TEST MODULES:
 
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
+    // const exe_tests = b.addTest(.{
+    //     .root_module = exe.root_module,
+    // });
+    // const run_exe_tests = b.addRunArtifact(exe_tests);
+
+    var scanner_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests/scanner_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
-    const run_exe_tests = b.addRunArtifact(exe_tests);
+    scanner_tests.root_module.addImport("scanner", scanner_mod);
+    scanner_tests.root_module.addImport("token", token_mod);
+    const run_scanner_tests = b.addRunArtifact(scanner_tests);
 
     // TEST STEP:
 
     const tests_step = b.step("test", "Run all tests");
-    tests_step.dependOn(&run_exe_tests.step);
+    // tests_step.dependOn(&run_exe_tests.step);
+    tests_step.dependOn(&run_scanner_tests.step);
 }
-

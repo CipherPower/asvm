@@ -8,6 +8,20 @@ const ScannerError = errors.ScannerError;
 const Token = token.Token;
 const TokenKind = token.TokenKind;
 
+const VM_MAX_REGISTERS: comptime_int = 8;
+
+fn isAlphanumeric(char: u8) bool {
+    return std.ascii.isAlphanumeric(char) or char == '_';
+}
+
+fn isOctal(char: u8) bool {
+    return char >= '0' and char <= '7';
+}
+
+fn isBinary(char: u8) bool {
+    return char == '0' or char == '1';
+}
+
 pub const Scanner = struct {
     input: []const u8,
     start: usize,
@@ -80,6 +94,112 @@ pub const Scanner = struct {
         }
     }
 
+    fn number(self: *Self, base: u8) ScannerErrorKind!void {
+        while (!self.isAtEnd()) {
+            const char: u8 = self.peek();
+            const valid: bool = switch (base) {
+                16 => std.ascii.isHex(char),
+                10 => std.ascii.isDigit(char),
+                8 => isOctal(char),
+                2 => isBinary(char),
+                else => unreachable,
+            };
+
+            if (!valid) break;
+            _ = self.next();
+        }
+
+        const full_literal: []const u8 = self.getLiteral();
+
+        const parse_slice: []const u8 = if (base == 10) full_literal else full_literal[2..];
+
+        if (parse_slice.len == 0) {
+            try self.addError(error.InvalidIntegerLiteral, full_literal);
+            return error.InvalidIntegerLiteral;
+        }
+
+        const number_value: i32 = std.fmt.parseInt(i32, parse_slice, base) catch {
+            try self.addError(error.InvalidIntegerLiteral, full_literal);
+            return error.InvalidIntegerLiteral;
+        };
+
+        try self.addToken(.{
+            .integer = number_value,
+        });
+    }
+
+    fn integer(self: *Self) ScannerErrorKind!void {
+        const first_digit: u8 = self.previous();
+
+        if (first_digit == '0' and !self.isAtEnd()) {
+            switch (self.peek()) {
+                'x' => {
+                    _ = self.next();
+                    return try self.number(16);
+                },
+
+                'b' => {
+                    _ = self.next();
+                    return try self.number(2);
+                },
+
+                'o' => {
+                    _ = self.next();
+                    return try self.number(8);
+                },
+
+                '0'...'9' => {},
+
+                else => {
+                    try self.addError(error.InvalidIntegerLiteral, self.getLiteral());
+                    return error.InvalidIntegerLiteral;
+                },
+            }
+        }
+
+        return try self.number(10);
+    }
+
+    fn identifier(self: *Self) ScannerErrorKind!void {
+        while (isAlphanumeric(self.peek()) and !self.isAtEnd()) {
+            _ = self.next();
+        }
+
+        const ident: []const u8 = self.getLiteral();
+
+        try self.addToken(.{
+            .identifier = ident,
+        });
+    }
+
+    fn register(self: *Self) ScannerErrorKind!void {
+        self.start = self.current;
+
+        while (std.ascii.isDigit(self.peek()) and !self.isAtEnd()) {
+            _ = self.next();
+        }
+
+        const number_literal: []const u8 = self.getLiteral();
+        if (number_literal.len == 0) {
+            try self.addError(error.InvalidRegisterLiteral, "r");
+            return error.InvalidRegisterLiteral;
+        }
+
+        const register_value: u8 = std.fmt.parseInt(u8, number_literal, 10) catch {
+            try self.addError(error.InvalidRegisterLiteral, number_literal);
+            return error.InvalidRegisterLiteral;
+        };
+
+        if (register_value >= VM_MAX_REGISTERS) {
+            try self.addError(error.InvalidRegisterLiteral, self.input[self.start - 1 .. self.current]);
+            return error.InvalidRegisterLiteral;
+        }
+
+        try self.addToken(.{
+            .register = register_value,
+        });
+    }
+
     fn string(self: *Self) ScannerErrorKind!void {
         self.start = self.current;
 
@@ -98,6 +218,22 @@ pub const Scanner = struct {
         });
 
         _ = self.next();
+    }
+
+    fn sync(self: *Self) void {
+        while (!self.isAtEnd()) {
+            if (self.previous() == '\n') return;
+
+            switch (self.peek()) {
+                '\n' => return,
+                '.' => return,
+                '#' => return,
+                'a'...'z', 'A'...'Z', '_' => return,
+                '"' => return,
+
+                else => _ = self.next(),
+            }
+        }
     }
 
     fn skipComment(self: *Self) void {
