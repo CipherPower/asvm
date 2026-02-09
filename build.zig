@@ -1,0 +1,76 @@
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    // BUILD OPTIONS:
+
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // MODULES:
+
+    const instructions_mod = b.addModule("instructions", .{
+        .root_source_file = b.path("src/common/instruction_set.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const token_mod = b.addModule("token", .{
+        .root_source_file = b.path("src/common/token.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const statement_mod = b.addModule("statement", .{
+        .root_source_file = b.path("src/common/statement.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var scanner_mod = b.addModule("scanner", .{
+        .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    scanner_mod.addImport("token", token_mod);
+
+    _ = instructions_mod;
+    _ = statement_mod;
+
+    // EXECUTABLE:
+
+    const exe = b.addExecutable(.{
+        .name = "asvm",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{},
+        }),
+    });
+
+    b.installArtifact(exe);
+
+    // RUN STEP:
+
+    const run_step = b.step("run", "Run the executable");
+    const run_cmd = b.addRunArtifact(exe);
+    run_step.dependOn(&run_cmd.step);
+    run_cmd.step.dependOn(b.getInstallStep());
+
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    // TESTS:
+
+    const exe_tests = b.addTest(.{
+        .root_module = exe.root_module,
+    });
+    const run_exe_tests = b.addRunArtifact(exe_tests);
+
+    // TEST STEP:
+
+    const tests_step = b.step("test", "Run all tests");
+    tests_step.dependOn(&run_exe_tests.step);
+}
+
