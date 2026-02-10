@@ -22,6 +22,7 @@ fn isBinary(char: u8) bool {
     return char == '0' or char == '1';
 }
 
+
 pub const Scanner = struct {
     input: []const u8,
     start: usize,
@@ -58,10 +59,14 @@ pub const Scanner = struct {
             self.start = self.current;
 
             self.scanToken() catch |err| switch (err) {
-                error.OutOfMemory => return err,
+                error.OutOfMemory => return error.OutOfMemory,
                 else => self.sync(),
             };
         }
+
+        self.addToken(.eof) catch {
+            return error.OutOfMemory;
+        };
     }
 
     fn scanToken(self: *Self) ScannerErrorKind!void {
@@ -86,12 +91,26 @@ pub const Scanner = struct {
 
             '"' => try self.string(),
 
-            'a'...'z', 'A'...'Z', '_' => {},
+            'a'...'z', 'A'...'Z', '_' => {
+                if (char == 'r' and std.ascii.isDigit(self.peek())) {
+                    try self.register();
+                } else {
+                    try self.identifier();
+                }
+            },
 
             '0'...'9' => try self.integer(),
 
-            else => {},
+            else => {
+                const literal = self.getLiteral();
+                try self.addError(error.UnexpectedCharacter, literal);
+                return error.UnexpectedCharacter;
+            },
         }
+    }
+
+    pub fn hasErrors(self: *const Self) bool {
+        return self.errors.items.len > 0;
     }
 
     fn number(self: *Self, base: u8) ScannerErrorKind!void {
@@ -257,21 +276,26 @@ pub const Scanner = struct {
     }
 
     fn addError(self: *Self, kind: ScannerErrorKind, literal: []const u8) ScannerErrorKind!void {
-        try self.errors.append(self.allocator, .{
+        const err: ScannerError = .{
             .kind = kind,
             .literal = literal,
             .line = self.line,
-        });
+        };
+
+        self.errors.append(self.allocator, err) catch {
+            return error.OutOfMemory;
+        };
     }
 
     fn addToken(self: *Self, kind: TokenKind) ScannerErrorKind!void {
-        try self.tokens.append(self.allocator, .{
-            .kind = kind,
-            .line = self.line,
-        });
+        const tok: Token = .init(kind, self.line);
+
+        self.tokens.append(self.allocator, tok) catch {
+            return error.OutOfMemory;
+        };
     }
 
-    fn next(self: Self) u8 {
+    fn next(self: *Self) u8 {
         const char: u8 = self.input[self.current];
         self.current += 1;
         return char;
