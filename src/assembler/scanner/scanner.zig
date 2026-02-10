@@ -22,7 +22,6 @@ fn isBinary(char: u8) bool {
     return char == '0' or char == '1';
 }
 
-
 pub const Scanner = struct {
     input: []const u8,
     start: usize,
@@ -35,7 +34,7 @@ pub const Scanner = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        return Self{
+        return .{
             .input = undefined,
             .start = 0,
             .current = 0,
@@ -282,17 +281,13 @@ pub const Scanner = struct {
             .line = self.line,
         };
 
-        self.errors.append(self.allocator, err) catch {
-            return error.OutOfMemory;
-        };
+        try self.errors.append(self.allocator, err);
     }
 
     fn addToken(self: *Self, kind: TokenKind) ScannerErrorKind!void {
         const tok: Token = .init(kind, self.line);
 
-        self.tokens.append(self.allocator, tok) catch {
-            return error.OutOfMemory;
-        };
+        try self.tokens.append(self.allocator, tok); 
     }
 
     fn next(self: *Self) u8 {

@@ -33,8 +33,14 @@ pub fn build(b: *std.Build) void {
     });
     scanner_mod.addImport("token", token_mod);
 
-    _ = instructions_mod;
-    _ = statement_mod;
+    var parser_mod = b.addModule("parser", .{
+        .root_source_file = b.path("src/assembler/parser/parser.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    parser_mod.addImport("token", token_mod);
+    parser_mod.addImport("statement", statement_mod);
+    parser_mod.addImport("instruction", instructions_mod);
 
     // EXECUTABLE:
 
