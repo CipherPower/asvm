@@ -1,6 +1,11 @@
 const std = @import("std");
 const InstructionSet = @import("instruction.zig").InstructionSet;
 
+const StaticMap = @import("util").StaticMap;
+
+pub fn resolveDirective(str: []const u8) ?DirectiveTag {
+    return Directive.table.get(str);
+}
 pub const Operand = union(enum) {
     register: u8,
     integer: i32,
@@ -19,10 +24,18 @@ pub const Operand = union(enum) {
     }
 };
 
+pub const DirectiveTag = enum {
+    entry,
+};
+
 pub const Directive = union(enum) {
     entry: Operand, // label
 
     const Self = @This();
+
+    pub const table: StaticMap(DirectiveTag) = .initComptime(.{
+        .{ "entry", DirectiveTag.entry },
+    });
 
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         switch (self) {

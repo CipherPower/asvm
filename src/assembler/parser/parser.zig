@@ -1,9 +1,12 @@
 const std = @import("std");
 const errors = @import("error.zig");
 const statement = @import("statement");
+const instructions = @import("instruction");
 
 const Token = @import("token").Token;
-const InstructionSet = @import("instruction").InstructionSet;
+
+const InstructionSet = instructions.InstructionSet;
+const resolveInstruction = instructions.resolveInstruction;
 
 const ParserErrorKind = errors.ParserErrorKind;
 const ParserError = errors.ParserError;
@@ -12,6 +15,8 @@ const Statement = statement.Statement;
 const StatementKind = statement.StatementKind;
 const Directive = statement.Directive;
 const Operand = statement.Operand;
+const resolveDirective = statement.resolveDirective;
+
 
 pub const Parser = struct {
     tokens: []Token,
@@ -79,25 +84,78 @@ pub const Parser = struct {
 
         const identifier: *Token = try self.expectIdentifier();
 
-        if (std.mem.eql(u8, "entry", identifier)) {
-            const label_token: *Token = try self.expectIdentifier();
-            const name: []const u8 = label_token.kind.identifier;
-
-            try self.addStatement(.{
-                .directive = .{
-                    .entry = .{
-                        .label = name,
-                    },
+        if () |directive_tag| {
+            switch (directive_tag) {
+                .entry => {
+                    const label_token: *Token = try self.expectIdentifier();
+                    try self.addStatement(.{
+                        .directive = .{
+                            .entry = .{
+                                .label = label_token.kind.identifier,
+                            },
+                        },
+                    });
                 },
-            });
-        } else {}
+            }
+        } else {
+            try self.addError(error.UnexpectedToken, "unknown directive");
+            return error.UnexpectedToken;
+        }
+    }
+
+    fn label(self: *Self) ParserErrorKind!void {
+        const ident: *Token = try self.expectIdentifier();
+        _ = self.next();
+
+        try self.addStatement(.{
+            .label = .{
+                .label = ident.kind.identifier,
+            },
+        });
+    }
+
+    fn instruction(self: *Self) ParserErrorKind!void {
+        const mnemonic_token: *Token = try self.expectIdentifier();
+
+        if (resolveInstruction(mnemonic_token.kind.identifier)) |instr| {
+            var operands: [2]Operand = .{ .none, .none };
+
+            if (!self.isNewStatement(mnemonic_token.line)) {
+                operands[0] = try self.operand();
+
+                if (self.matchToken(.comma)) {
+                    operands[1] = try self.operand();
+                }
+            }
+
+        } else {
+
+        }
+    }
+
+    fn operand(self: *Self) ParserErrorKind!Operand {
+        switch (self.peek().kind) {
+
+        }
+    }
+
+    fn isNewStatement(self: *const Self, current_line: usize) bool {
+        if (self.peek().line > current_line) return true;
+
+        return switch (self.peek().tag()) {
+            .eof => true,
+            .dot => true,
+            .identifier => self.peekNext().tag() == .colon,
+            else => false,
+        ;}
     }
 
     fn expectIdentifier(self: *Self) ParserErrorKind!*Token {
         if (self.peek().tag() == .identifier) {
             return self.next();
         } else {
-            const literal: []const u8 = std.fmt.allocPrint(self.allocator, "{f}", self.peek().*);
+            // const literal: []const u8 = std.fmt.allocPrint(self.allocator, "{f}", self.peek().*);
+            const literal: []const u8 = "temporary";
             try self.addError(error.UnexpectedToken, literal);
 
             return error.UnexpectedToken;

@@ -8,11 +8,18 @@ pub fn build(b: *std.Build) void {
 
     // MODULES:
 
-    const instructions_mod = b.addModule("instructions", .{
+    const util_mod = b.addModule("util", .{
+        .root_source_file = b.path("src/common/util.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var instructions_mod = b.addModule("instructions", .{
         .root_source_file = b.path("src/common/instruction_set.zig"),
         .target = target,
         .optimize = optimize,
     });
+    instructions_mod.addImport("util", util_mod);
 
     const token_mod = b.addModule("token", .{
         .root_source_file = b.path("src/common/token.zig"),
@@ -20,11 +27,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const statement_mod = b.addModule("statement", .{
+    var statement_mod = b.addModule("statement", .{
         .root_source_file = b.path("src/common/statement.zig"),
         .target = target,
         .optimize = optimize,
     });
+    statement_mod.addImport("util", util_mod);
 
     var scanner_mod = b.addModule("scanner", .{
         .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
