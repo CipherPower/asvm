@@ -4,6 +4,7 @@ const statement = @import("statement");
 const instructions = @import("instruction");
 
 const Token = @import("token").Token;
+const TokenKindTag = @import("token").TokenKindTag;
 
 const InstructionSet = instructions.InstructionSet;
 const resolveInstruction = instructions.resolveInstruction;
@@ -15,8 +16,8 @@ const Statement = statement.Statement;
 const StatementKind = statement.StatementKind;
 const Directive = statement.Directive;
 const Operand = statement.Operand;
+const DirectiveTag = statement.DirectiveTag;
 const resolveDirective = statement.resolveDirective;
-
 
 pub const Parser = struct {
     tokens: []Token,
@@ -54,7 +55,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseStatement(self: *Self) ParserErrorKind!void {
+    fn parseStatement(self: *Self) ParserErrorKind!void {
         switch (self.peek().tag()) {
             .dot => try self.directive(),
 
@@ -82,24 +83,22 @@ pub const Parser = struct {
     fn directive(self: *Self) ParserErrorKind!void {
         _ = self.next();
 
-        const identifier: *Token = try self.expectIdentifier();
+        const name_token: *Token = try self.expectIdentifier();
 
-        if () |directive_tag| {
-            switch (directive_tag) {
-                .entry => {
-                    const label_token: *Token = try self.expectIdentifier();
-                    try self.addStatement(.{
-                        .directive = .{
-                            .entry = .{
-                                .label = label_token.kind.identifier,
-                            },
-                        },
-                    });
-                },
-            }
-        } else {
-            try self.addError(error.UnexpectedToken, "unknown directive");
+        const tag: DirectiveTag = resolveDirective(name_token.kind.identifier) orelse {
+            try self.addError(error.UnexpectedToken, "Unknown directive");
             return error.UnexpectedToken;
+        };
+
+        switch (tag) {
+            .empty => {
+                const label_token: *Token = try self.expectIdentifier();
+                try self.addStatement(.{
+                    .directive = .{
+                        .entry = label_token.kind.identifier,
+                    },
+                });
+            },
         }
     }
 
@@ -108,34 +107,70 @@ pub const Parser = struct {
         _ = self.next();
 
         try self.addStatement(.{
-            .label = .{
-                .label = ident.kind.identifier,
-            },
+            .label = ident.kind.identifier,
         });
     }
 
     fn instruction(self: *Self) ParserErrorKind!void {
         const mnemonic_token: *Token = try self.expectIdentifier();
 
-        if (resolveInstruction(mnemonic_token.kind.identifier)) |instr| {
-            var operands: [2]Operand = .{ .none, .none };
+        const instr: InstructionSet = resolveInstruction(mnemonic_token.kind.identifier) orelse {
+            try self.addError(error.UnrecognisedInstruction, "temporary");
+            return error.UnrecognisedInstruction;
+        };
 
-            if (!self.isNewStatement(mnemonic_token.line)) {
-                operands[0] = try self.operand();
+        var operands: [2]Operand = .{ .none, .none };
 
-                if (self.matchToken(.comma)) {
-                    operands[1] = try self.operand();
-                }
+        if (!self.isNewStatement(mnemonic_token.line)) {
+            operands[0] = try self.operand();
+
+            if (self.match(.comma)) {
+                operands[1] = try self.operand();
             }
-
-        } else {
-
         }
+
+        try self.addStatement(.{
+            .instruction = .{
+                .instruction = instr,
+                .operands = operands,
+            },
+        });
     }
 
     fn operand(self: *Self) ParserErrorKind!Operand {
-        switch (self.peek().kind) {
+        const token: *Token = self.peek();
+        
+        switch (token.kind) {
+            .register => |reg_value| {
+                _ = self.next();
+                return .{ .register = reg_value };
+            },
 
+            .integer => |int_value| {
+                _ = self.next();
+                return .{ .integer = int_value };
+            },
+
+            .hashtag => {
+                _ = self.next();
+
+                if (self.check(.integer)) {
+                    return try self.operand();
+                } else {
+                    try self.addError(error.UnexpectedOperand, "temporary");
+                    return error.UnexpectedOperand;
+                }
+            },
+
+            .identifier => |ident| {
+                _ = self.next();
+                return .{ .label = ident };
+            },
+
+            else => {
+                try self.addError(error.UnexpectedOperand, "temporary");
+                return error.UnexpectedOperand;
+            }
         }
     }
 
@@ -147,23 +182,21 @@ pub const Parser = struct {
             .dot => true,
             .identifier => self.peekNext().tag() == .colon,
             else => false,
-        ;}
+        };
     }
 
     fn expectIdentifier(self: *Self) ParserErrorKind!*Token {
         if (self.peek().tag() == .identifier) {
             return self.next();
         } else {
-            // const literal: []const u8 = std.fmt.allocPrint(self.allocator, "{f}", self.peek().*);
-            const literal: []const u8 = "temporary";
-            try self.addError(error.UnexpectedToken, literal);
+            try self.addError(error.UnexpectedToken, "temporary");
 
             return error.UnexpectedToken;
         }
     }
 
     fn addStatement(self: *Self, kind: StatementKind) ParserErrorKind!void {
-        const stmt: Statement = .init(kind, self.peek().line);
+        const stmt: Statement = .init(kind, self.previous().line);
         try self.statements.append(self.allocator, stmt);
     }
 
@@ -196,6 +229,20 @@ pub const Parser = struct {
 
             _ = self.next();
         }
+    }
+
+    fn match(self: *Self, kind: TokenKindTag) bool {
+        if (self.check(kind)) {
+            _ = self.next();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    fn check(self: *Self, kind: TokenKindTag) bool {
+        if (self.isAtEnd()) return false;
+        return self.peek().tag() == kind;
     }
 
     fn peekNext(self: *const Self) *Token {

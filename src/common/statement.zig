@@ -29,7 +29,7 @@ pub const DirectiveTag = enum {
 };
 
 pub const Directive = union(enum) {
-    entry: Operand, // label
+    entry: []const u8, // label
 
     const Self = @This();
 
@@ -39,13 +39,13 @@ pub const Directive = union(enum) {
 
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         switch (self) {
-            .entry => |op_label| try writer.print("directive(op = {f})", .{op_label}),
+            .entry => |label| try writer.print("directive(entry = {s})", .{label}),
         }
     }
 };
 
 pub const StatementKind = union(enum) {
-    label: Operand, // label
+    label: []const u8, // label
     instruction: struct {
         instruction: InstructionSet,
         operands: [2]Operand,
@@ -60,7 +60,7 @@ pub const StatementKind = union(enum) {
 
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         switch (self) {
-            .label => |op_label| try writer.print("statementkind(op = {f})", .{op_label}),
+            .label => |op_label| try writer.print("statementkind(label = {s})", .{op_label}),
             .instruction => |instr_struct| {
                 try writer.print("statementkind(instr = {s}, operands = [{f}, {f}])", .{
                     @tagName(instr_struct.instruction),
