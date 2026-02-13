@@ -86,6 +86,18 @@ pub const Statement = struct {
         };
     }
 
+    pub fn instr(instruction: InstructionSet, line: usize, op1: Operand, op2: Operand) Self {
+        return .{
+            .kind = .{
+                .instruction = .{
+                    .instruction = instruction,
+                    .operands = .{ op1, op2 },
+                },
+            },
+            .line = line,
+        };
+    }
+
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         try writer.print("statement(kind = {f}, line = {d})", .{ self.kind, self.line });
     }

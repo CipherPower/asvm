@@ -167,7 +167,7 @@ test "scanning string literals" {
     printPass("scanning string literals");
 }
 
-test "scanner errors" {
+test "scanning bad input" {
     const input: []const u8 = "0x r10";
 
     var scanner: Scanner = .init(testing.allocator);
@@ -178,5 +178,5 @@ test "scanner errors" {
     try assert(scanner.hasErrors());
     try assert(scanner.errors.items.len == 2);
 
-    printPass("scanner errors");
+    printPass("scanning bad input");
 }

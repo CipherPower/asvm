@@ -9,7 +9,7 @@ const TokenKindTag = @import("token").TokenKindTag;
 const InstructionSet = instructions.InstructionSet;
 const resolveInstruction = instructions.resolveInstruction;
 
-const ParserErrorKind = errors.ParserErrorKind;
+pub const ParserErrorKind = errors.ParserErrorKind;
 const ParserError = errors.ParserError;
 
 const Statement = statement.Statement;
@@ -67,7 +67,9 @@ pub const Parser = struct {
                 }
             },
 
-            .eof => {},
+            .eof => {
+                _ = self.next();
+            },
 
             else => {
                 try self.addError(error.UnexpectedToken, "Expected label, directive or instruction");
@@ -241,7 +243,7 @@ pub const Parser = struct {
         }
     }
 
-    fn check(self: *const Self, kind: TokenKindTag) bool {
+    fn check(self: *Self, kind: TokenKindTag) bool {
         if (self.isAtEnd()) return false;
         return self.peek().tag() == kind;
     }
@@ -271,7 +273,6 @@ pub const Parser = struct {
     }
 
     fn isAtEnd(self: *const Self) bool {
-        if (self.check(.eof)) return true;
         return self.current >= self.tokens.len;
     }
 
