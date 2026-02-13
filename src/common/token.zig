@@ -76,6 +76,6 @@ pub const Token = struct {
     }
 
     pub fn tag(self: Self) TokenKindTag {
-        return @as(TokenKindTag, self);
+        return @as(TokenKindTag, self.kind);
     }
 };

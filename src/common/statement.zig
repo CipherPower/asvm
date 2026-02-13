@@ -1,5 +1,5 @@
 const std = @import("std");
-const InstructionSet = @import("instruction.zig").InstructionSet;
+const InstructionSet = @import("instruction").InstructionSet;
 
 const StaticMap = @import("util").StaticMap;
 

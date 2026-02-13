@@ -49,7 +49,7 @@ pub const Parser = struct {
 
         while (!self.isAtEnd()) {
             self.parseStatement() catch |err| switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
+                error.OutOfMemory => return error.OutOfMemory,
                 else => self.sync(),
             };
         }
@@ -91,7 +91,7 @@ pub const Parser = struct {
         };
 
         switch (tag) {
-            .empty => {
+            .entry => {
                 const label_token: *Token = try self.expectIdentifier();
                 try self.addStatement(.{
                     .directive = .{
@@ -115,7 +115,7 @@ pub const Parser = struct {
         const mnemonic_token: *Token = try self.expectIdentifier();
 
         const instr: InstructionSet = resolveInstruction(mnemonic_token.kind.identifier) orelse {
-            try self.addError(error.UnrecognisedInstruction, "temporary");
+            try self.addError(error.UnrecognisedInstruction, "Unknown instruction");
             return error.UnrecognisedInstruction;
         };
 
@@ -139,7 +139,7 @@ pub const Parser = struct {
 
     fn operand(self: *Self) ParserErrorKind!Operand {
         const token: *Token = self.peek();
-        
+
         switch (token.kind) {
             .register => |reg_value| {
                 _ = self.next();
@@ -155,9 +155,10 @@ pub const Parser = struct {
                 _ = self.next();
 
                 if (self.check(.integer)) {
-                    return try self.operand();
+                    const int_value: i32 = self.next().kind.integer;
+                    return .{ .integer = int_value };
                 } else {
-                    try self.addError(error.UnexpectedOperand, "temporary");
+                    try self.addError(error.UnexpectedOperand, "Unexpected operand");
                     return error.UnexpectedOperand;
                 }
             },
@@ -168,9 +169,9 @@ pub const Parser = struct {
             },
 
             else => {
-                try self.addError(error.UnexpectedOperand, "temporary");
+                try self.addError(error.UnexpectedOperand, "Unknown operand");
                 return error.UnexpectedOperand;
-            }
+            },
         }
     }
 
@@ -189,7 +190,7 @@ pub const Parser = struct {
         if (self.peek().tag() == .identifier) {
             return self.next();
         } else {
-            try self.addError(error.UnexpectedToken, "temporary");
+            try self.addError(error.UnexpectedToken, "expected identifier");
 
             return error.UnexpectedToken;
         }
@@ -240,7 +241,7 @@ pub const Parser = struct {
         }
     }
 
-    fn check(self: *Self, kind: TokenKindTag) bool {
+    fn check(self: *const Self, kind: TokenKindTag) bool {
         if (self.isAtEnd()) return false;
         return self.peek().tag() == kind;
     }
@@ -270,6 +271,7 @@ pub const Parser = struct {
     }
 
     fn isAtEnd(self: *const Self) bool {
+        if (self.check(.eof)) return true;
         return self.current >= self.tokens.len;
     }
 

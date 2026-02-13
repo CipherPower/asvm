@@ -33,6 +33,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     statement_mod.addImport("util", util_mod);
+    statement_mod.addImport("instruction", instructions_mod);
 
     var scanner_mod = b.addModule("scanner", .{
         .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
@@ -93,9 +94,24 @@ pub fn build(b: *std.Build) void {
     scanner_tests.root_module.addImport("token", token_mod);
     const run_scanner_tests = b.addRunArtifact(scanner_tests);
 
+    var parser_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests/parser_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    parser_tests.root_module.addImport("parser", parser_mod);
+    parser_tests.root_module.addImport("token", token_mod);
+    parser_tests.root_module.addImport("util", util_mod);
+    parser_tests.root_module.addImport("instruction", instructions_mod);
+    parser_tests.root_module.addImport("statement", statement_mod);
+    const run_parser_tests = b.addRunArtifact(parser_tests);
+
     // TEST STEP:
 
     const tests_step = b.step("test", "Run all tests");
     // tests_step.dependOn(&run_exe_tests.step);
     tests_step.dependOn(&run_scanner_tests.step);
+    tests_step.dependOn(&run_parser_tests.step);
 }
