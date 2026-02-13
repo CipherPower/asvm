@@ -4,6 +4,7 @@ const statement = @import("statement");
 const instructions = @import("instruction");
 
 const Token = @import("token").Token;
+const TokenKind = @import("token").TokenKind;
 const TokenKindTag = @import("token").TokenKindTag;
 
 const InstructionSet = instructions.InstructionSet;
@@ -39,6 +40,12 @@ pub const Parser = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        if (self.hasErrors()) {
+            for (self.errors.items) |err| {
+                self.allocator.free(err.literal);
+            }
+        }
+
         self.statements.deinit(self.allocator);
         self.errors.deinit(self.allocator);
     }
@@ -72,7 +79,8 @@ pub const Parser = struct {
             },
 
             else => {
-                try self.addError(error.UnexpectedToken, "Expected label, directive or instruction");
+                const error_message: []const u8 = try self.formatToken("expected label, directive or instruction. Received:", self.peek().kind);
+                try self.addError(error.UnexpectedToken, error_message);
                 return error.UnexpectedToken;
             },
         }
@@ -88,7 +96,8 @@ pub const Parser = struct {
         const name_token: *Token = try self.expectIdentifier();
 
         const tag: DirectiveTag = resolveDirective(name_token.kind.identifier) orelse {
-            try self.addError(error.UnexpectedToken, "Unknown directive");
+            const error_message: []const u8 = try self.formatToken("Expected directive, received:", self.previous().kind);
+            try self.addError(error.UnexpectedToken, error_message);
             return error.UnexpectedToken;
         };
 
@@ -117,7 +126,8 @@ pub const Parser = struct {
         const mnemonic_token: *Token = try self.expectIdentifier();
 
         const instr: InstructionSet = resolveInstruction(mnemonic_token.kind.identifier) orelse {
-            try self.addError(error.UnrecognisedInstruction, "Unknown instruction");
+            const error_message: []const u8 = try self.formatToken("Unknown instruction:", self.previous().kind);
+            try self.addError(error.UnrecognisedInstruction, error_message);
             return error.UnrecognisedInstruction;
         };
 
@@ -160,7 +170,8 @@ pub const Parser = struct {
                     const int_value: i32 = self.next().kind.integer;
                     return .{ .integer = int_value };
                 } else {
-                    try self.addError(error.UnexpectedOperand, "Unexpected operand");
+                    const error_message: []const u8 = try self.formatToken("Expected numerical value, received:", self.peek().kind);
+                    try self.addError(error.UnexpectedOperand, error_message);
                     return error.UnexpectedOperand;
                 }
             },
@@ -171,7 +182,8 @@ pub const Parser = struct {
             },
 
             else => {
-                try self.addError(error.UnexpectedOperand, "Unknown operand");
+                const error_message: []const u8 = try self.formatToken("invalid operand:", self.peek().kind);
+                try self.addError(error.UnexpectedOperand, error_message);
                 return error.UnexpectedOperand;
             },
         }
@@ -192,8 +204,8 @@ pub const Parser = struct {
         if (self.peek().tag() == .identifier) {
             return self.next();
         } else {
-            try self.addError(error.UnexpectedToken, "expected identifier");
-
+            const error_message: []const u8 = try self.formatToken("Expected identifier, received:", self.peek().kind);
+            try self.addError(error.UnexpectedToken, error_message);
             return error.UnexpectedToken;
         }
     }
@@ -274,6 +286,11 @@ pub const Parser = struct {
 
     fn isAtEnd(self: *const Self) bool {
         return self.current >= self.tokens.len;
+    }
+
+    fn formatToken(self: *const Self, msg: []const u8, token: TokenKind) ParserErrorKind![]const u8 {
+        const message: []const u8 = try std.fmt.allocPrint(self.allocator, "{s} {f}", .{ msg, token });
+        return message;
     }
 
     fn clear(self: *Self) void {

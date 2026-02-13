@@ -39,10 +39,10 @@ pub const TokenKind = union(TokenKindTag) {
 
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         switch (self) {
-            .identifier => |ident| try writer.print("identifier(\"{s}\")", .{ident}),
-            .integer => |int| try writer.print("integer({d})", .{int}),
-            .register => |reg| try writer.print("register(r{d})", .{reg}),
-            .string_literal => |lit| try writer.print("string(\"{s}\")", .{lit}),
+            .identifier => |ident| try writer.print("\"{s}\"", .{ident}),
+            .integer => |int| try writer.print("'{d}'", .{int}),
+            .register => |reg| try writer.print("'r{d}'", .{reg}),
+            .string_literal => |lit| try writer.print("\"{s}\"", .{lit}),
             .dot => try writer.writeAll("'.'"),
             .colon => try writer.writeAll("':'"),
             .comma => try writer.writeAll("','"),
