@@ -42,7 +42,7 @@ pub const Parser = struct {
     pub fn deinit(self: *Self) void {
         if (self.hasErrors()) {
             for (self.errors.items) |err| {
-                self.allocator.free(err.literal);
+                self.allocator.free(@constCast(err.literal));
             }
         }
 
@@ -294,6 +294,12 @@ pub const Parser = struct {
     }
 
     fn clear(self: *Self) void {
+        if (self.hasErrors()) {
+            for (self.errors.items) |err| {
+                self.allocator.free(@constCast(err.literal));
+            }
+        }
+
         self.tokens = undefined;
         self.statements.clearRetainingCapacity();
         self.errors.clearRetainingCapacity();
