@@ -34,6 +34,7 @@ pub const InstructionSet = enum(u8) {
     str,
     jnz,
     hlt,
+    lea,
 
     const Self = @This();
 
@@ -65,6 +66,7 @@ pub const InstructionSet = enum(u8) {
         .{ "str", Self.str },
         .{ "jnz", Self.jnz },
         .{ "hlt", Self.hlt },
+        .{ "lea", Self.lea },
     });
 
     pub fn toByte(self: Self) u8 {

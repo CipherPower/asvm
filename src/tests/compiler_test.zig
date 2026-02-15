@@ -41,8 +41,9 @@ test "empty compiler" {
 test "compiling minimal program" {
     const statements: []const Statement = &.{
         .init(.{ .directive = .{ .entry = "_start" } }, 1),
-        .init(.{ .label = "_start" }, 2),
-        .instr(.syscall, 3, .none, .none),
+        .init(.{ .directive = .{ .segment = "text" } }, 2),
+        .init(.{ .label = "_start" }, 3),
+        .instr(.syscall, 4, .none, .none),
     };
 
     var expected: std.ArrayList(u8) = .empty;
@@ -64,8 +65,9 @@ test "compiling minimal program" {
 test "compiling program with registers and operands" {
     const statements: []const Statement = &.{
         .init(.{ .directive = .{ .entry = "_start" } }, 1),
-        .init(.{ .label = "_start" }, 2),
-        .instr(.mov, 3, .{ .register = 0 }, .{ .integer = 10 }),
+        .init(.{ .directive = .{ .segment = "text" } }, 2),
+        .init(.{ .label = "_start" }, 3),
+        .instr(.mov, 4, .{ .register = 0 }, .{ .integer = 10 }),
     };
 
     var expected: std.ArrayList(u8) = .empty;
@@ -89,10 +91,11 @@ test "compiling program with registers and operands" {
 test "compiling program with forward label resolution" {
     const statements: []const Statement = &.{
         .init(.{ .directive = .{ .entry = "_start" } }, 1),
-        .init(.{ .label = "_start" }, 2),
-        .instr(.jmp, 3, .{ .label = "end" }, .none),
-        .init(.{ .label = "end" }, 4),
-        .instr(.ret, 5, .none, .none),
+        .init(.{ .directive = .{ .segment = "text" } }, 2),
+        .init(.{ .label = "_start" }, 3),
+        .instr(.jmp, 4, .{ .label = "end" }, .none),
+        .init(.{ .label = "end" }, 5),
+        .instr(.ret, 6, .none, .none),
     };
 
     var expected: std.ArrayList(u8) = .empty;
@@ -117,7 +120,8 @@ test "compiler error missing entry directive" {
     // ret
 
     const statements: []const Statement = &.{
-        .instr(.ret, 1, .none, .none),
+        .init(.{ .directive = .{ .segment = "text" } }, 1),
+        .instr(.ret, 2, .none, .none),
     };
 
     var compiler: Compiler = .init(testing.allocator);
@@ -138,8 +142,9 @@ test "compiler error undefined label" {
 
     const statements: []const Statement = &.{
         .init(.{ .directive = .{ .entry = "_start" } }, 1),
-        .init(.{ .label = "_start" }, 2),
-        .instr(.jmp, 3, .{ .label = "missing_label" }, .none),
+        .init(.{ .directive = .{ .segment = "text" } }, 2),
+        .init(.{ .label = "_start" }, 3),
+        .instr(.jmp, 4, .{ .label = "missing_label" }, .none),
     };
 
     var compiler: Compiler = .init(testing.allocator);

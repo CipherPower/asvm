@@ -67,7 +67,11 @@ pub const Parser = struct {
             .dot => try self.directive(),
 
             .identifier => {
-                if (self.peekNext().tag() == .colon) {
+                const ident: []const u8 = self.peek().kind.identifier;
+
+                if (std.mem.eql(u8, ident, "segment")) {
+                    try self.segmentDirective();
+                } else if (self.peekNext().tag() == .colon) {
                     try self.label();
                 } else {
                     try self.instruction();
@@ -98,6 +102,25 @@ pub const Parser = struct {
         try writer.flush();
     }
 
+    fn segmentDirective(self: *Self) ParserErrorKind!void {
+        _ = self.next();
+
+        if (!self.match(.dot)) {
+            const error_message: []const u8 = try self.formatToken("Expected '.' after:", self.previous().kind);
+            try self.addError(error.UnexpectedToken, error_message);
+            return error.UnexpectedToken;
+        }
+
+        const name_token: *const Token = try self.expectIdentifier();
+        if (std.mem.eql(u8, name_token.kind.identifier, "text") or std.mem.eql(u8, name_token.kind.identifier, "data")) {
+            try self.addStatement(.{ .directive = .{ .segment = name_token.kind.identifier } });
+        } else {
+            const error_message: []const u8 = try self.formatToken("Expected 'text' or 'data' after:", self.previous().kind);
+            try self.addError(error.UnexpectedToken, error_message);
+            return error.UnexpectedToken;
+        }
+    }
+
     fn directive(self: *Self) ParserErrorKind!void {
         _ = self.next();
 
@@ -118,6 +141,19 @@ pub const Parser = struct {
                     },
                 });
             },
+
+            .string => {
+                if (self.check(.string_literal)) {
+                    const string_token: *const Token = self.next();
+                    try self.addStatement(.{ .directive = .{ .string = string_token.kind.string_literal } });
+                } else {
+                    const error_message: []const u8 = try self.formatToken("Expected string literal, received:", self.peek().kind);
+                    try self.addError(error.UnexpectedToken, error_message);
+                    return error.UnexpectedToken;
+                }
+            },
+
+            else => {},
         }
     }
 

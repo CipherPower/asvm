@@ -7,5 +7,6 @@ pub const VirtualError = error{
     InvalidRegister,
     DivideByZero,
     StackOverflow,
+    UnknownSyscall,
     StackUndeflow,
 };

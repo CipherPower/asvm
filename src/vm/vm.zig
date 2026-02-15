@@ -36,6 +36,7 @@ pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError, writer: *std.
         error.InvalidRegister => "Invalid register (0 -> 15)",
         error.MemoryOutOfBounds => "Segmentation fault",
         error.StackOverflow => "Stack overflow",
+        error.UnknownSyscall => "Unrecognised syscall id",
         error.StackUndeflow => "Stack underflow",
     };
 
@@ -90,6 +91,7 @@ pub const VirtualMachine = struct {
         table[@intFromEnum(InstructionSet.str)] = &handleStr;
         table[@intFromEnum(InstructionSet.jnz)] = &handleJnz;
         table[@intFromEnum(InstructionSet.hlt)] = &handleHlt;
+        table[@intFromEnum(InstructionSet.lea)] = &handleLea;
 
         break :build_table table;
     };
@@ -423,7 +425,45 @@ pub const VirtualMachine = struct {
 
     fn handleSyscall(self: *Self, mode: AddressingMode) VirtualError!void {
         _ = mode;
-        std.debug.print("SYSCALL [r0: {d}]\n", .{self.registers[0]});
+
+        const syscall_id: i32 = self.registers[0];
+        const arg1: i32 = self.registers[1];
+
+        switch (syscall_id) {
+            1 => {
+                std.debug.print("{d}", .{arg1});
+            },
+
+            2 => {
+                const char: u8 = truncateDword(u8, arg1);
+                std.debug.print("{c}", .{char});
+            },
+
+            3 => {
+                var addr: u16 = truncateDword(u16, arg1);
+                while (addr < self.memory.len) : (addr +%= 1) {
+                    const char: u8 = self.memory[addr];
+                    if (char == 0) break;
+                    std.debug.print("{c}", .{char});
+                }
+            },
+
+            4 => {
+                std.debug.print("\n", .{});
+            },
+
+            else => return error.UnknownSyscall,
+        }
+    }
+
+    fn handleLea(self: *Self, mode: AddressingMode) VirtualError!void {
+        if (mode != .memory) return error.InvalidAddressingMode;
+
+        const dest_register: u8 = try self.fetchByte();
+        try checkRegister(dest_register);
+
+        const target_address: u16 = try self.fetchWord();
+        self.registers[dest_register] = @intCast(target_address);
     }
 
     fn handleHlt(self: *Self, mode: AddressingMode) VirtualError!void {

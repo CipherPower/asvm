@@ -51,12 +51,21 @@ fn calculateInstructionSize(operands: [2]Operand) u16 {
     return size;
 }
 
+const Segment = enum {
+    none,
+    data,
+    text,
+};
+
 pub const Compiler = struct {
     output: std.ArrayList(u8),
     symbol_table: std.StringHashMap(u16),
     errors: std.ArrayList(CompilerError),
     entry_point_label: ?[]const u8,
     entry_point_address: ?u16,
+    current_segment: Segment,
+    seen_text: bool,
+    seen_data: bool,
     allocator: std.mem.Allocator,
 
     const Self = @This();
@@ -68,6 +77,9 @@ pub const Compiler = struct {
             .errors = .empty,
             .entry_point_label = null,
             .entry_point_address = null,
+            .current_segment = .none,
+            .seen_text = false,
+            .seen_data = false,
             .allocator = allocator,
         };
     }
@@ -106,6 +118,10 @@ pub const Compiler = struct {
                 },
 
                 .instruction => |instr| {
+                    if (self.current_segment != .text) {
+                        try self.addError(error.InstructionOutsideTextSegment, @tagName(instr.instruction), stmt.line);
+                    }
+
                     if (resolveAddressingMode(instr.operands)) |_| {
                         current_offset += calculateInstructionSize(instr.operands);
                     } else |err| {
@@ -122,9 +138,41 @@ pub const Compiler = struct {
                                 self.entry_point_label = label_name;
                             }
                         },
+
+                        .string => |str| {
+                            if (self.current_segment != .data) {
+                                try self.addError(error.DirectiveOutsideDataSegment, ".string", stmt.line);
+                            } else {
+                                current_offset += @as(u16, @truncate(str.len)) + 1; // for null term
+                            }
+                        },
+
+                        .segment => |segment| {
+                            if (std.mem.eql(u8, segment, "data")) {
+                                if (self.seen_data) {
+                                    try self.addError(error.DuplicateSegment, ".data", stmt.line);
+                                } else {
+                                    self.seen_data = true;
+                                    self.current_segment = .data;
+                                }
+                            } else if (std.mem.eql(u8, segment, "text")) {
+                                if (self.seen_text) {
+                                    try self.addError(error.DuplicateSegment, ".text", stmt.line);
+                                } else {
+                                    self.seen_text = true;
+                                    self.current_segment = .text;
+                                }
+                            } else {
+                                try self.addError(error.InvalidSegment, segment, stmt.line);
+                            }
+                        },
                     }
                 },
             }
+        }
+
+        if (!self.seen_text) {
+            try self.addError(error.MissingTextSegment, ".text", 1);
         }
 
         if (self.entry_point_label == null) {
@@ -147,6 +195,18 @@ pub const Compiler = struct {
         for (statements) |stmt| {
             switch (stmt.kind) {
                 .instruction => try self.emitInstruction(stmt),
+
+                .directive => |dir| {
+                    switch (dir) {
+                        .string => |str| {
+                            try self.emitBytes(str);
+                            try self.emitByte(0); // null terminator
+                        },
+
+                        else => {},
+                    }
+                },
+
                 else => {},
             }
         }
@@ -220,5 +280,8 @@ pub const Compiler = struct {
         self.symbol_table.clearRetainingCapacity();
         self.entry_point_label = null;
         self.entry_point_address = null;
+        self.current_segment = .none;
+        self.seen_text = false;
+        self.seen_data = false;
     }
 };

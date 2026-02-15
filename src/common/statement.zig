@@ -26,20 +26,28 @@ pub const Operand = union(enum) {
 
 pub const DirectiveTag = enum {
     entry,
+    string,
+    segment,
 };
 
 pub const Directive = union(enum) {
     entry: []const u8, // label
+    string: []const u8,
+    segment: []const u8,
 
     const Self = @This();
 
     pub const table: StaticMap(DirectiveTag) = .initComptime(.{
         .{ "entry", DirectiveTag.entry },
+        .{ "string", DirectiveTag.string },
+        // segment removed as its technically a keyword
     });
 
     pub fn format(self: Self, writer: *std.Io.Writer) !void {
         switch (self) {
             .entry => |label| try writer.print("directive(entry = {s})", .{label}),
+            .string => |str| try writer.print("directive(string = \"{s}\"", .{str}),
+            .segment => |segment| try writer.print("directive(segment = {s})", .{segment}),
         }
     }
 };

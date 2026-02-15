@@ -7,6 +7,11 @@ pub const CompilerErrorKind = error{
     RedefinedLabel,
     InvalidAddressingMode,
     InvalidOperand,
+    DuplicateSegment,
+    MissingTextSegment,
+    DirectiveOutsideDataSegment,
+    InstructionOutsideTextSegment,
+    InvalidSegment,
     OutOfMemory,
 };
 
@@ -33,6 +38,11 @@ pub const CompilerError = struct {
             error.MissingEntryDirective => "Missing entry directive",
             error.UndefinedLabel => "Label not defined",
             error.RedefinedLabel => "Label redefined",
+            error.DuplicateSegment => "Duplicate segment",
+            error.MissingTextSegment => "Missing text segment",
+            error.DirectiveOutsideDataSegment => "Directive cannot be used outside data segment",
+            error.InstructionOutsideTextSegment => "Instruction outside text segment",
+            error.InvalidSegment => "Invalid segment",
             error.OutOfMemory => "Out of memory, cannot continue compilation",
         };
 
