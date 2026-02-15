@@ -112,6 +112,12 @@ pub const Scanner = struct {
         return self.errors.items.len > 0;
     }
 
+    pub fn handleErrors(self: *const Self, writer: *std.Io.Writer) !void {
+        for (self.errors.items) |err| {
+            try writer.print("{f}\n", .{err});
+        }
+    }
+
     fn number(self: *Self, base: u8) ScannerErrorKind!void {
         while (!self.isAtEnd()) {
             const char: u8 = self.peek();
@@ -287,7 +293,7 @@ pub const Scanner = struct {
     fn addToken(self: *Self, kind: TokenKind) ScannerErrorKind!void {
         const tok: Token = .init(kind, self.line);
 
-        try self.tokens.append(self.allocator, tok); 
+        try self.tokens.append(self.allocator, tok);
     }
 
     fn next(self: *Self) u8 {

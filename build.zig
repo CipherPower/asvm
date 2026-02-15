@@ -14,12 +14,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    var instructions_mod = b.addModule("instructions", .{
+    const instructions_mod = b.addModule("instructions", .{
         .root_source_file = b.path("src/common/instruction_set.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "util", .module = util_mod },
+        },
     });
-    instructions_mod.addImport("util", util_mod);
 
     const token_mod = b.addModule("token", .{
         .root_source_file = b.path("src/common/token.zig"),
@@ -27,29 +29,67 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    var statement_mod = b.addModule("statement", .{
+    const statement_mod = b.addModule("statement", .{
         .root_source_file = b.path("src/common/statement.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "util", .module = util_mod },
+            .{ .name = "instruction", .module = instructions_mod },
+        },
     });
-    statement_mod.addImport("util", util_mod);
-    statement_mod.addImport("instruction", instructions_mod);
 
-    var scanner_mod = b.addModule("scanner", .{
+    const scanner_mod = b.addModule("scanner", .{
         .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "token", .module = token_mod },
+        },
     });
-    scanner_mod.addImport("token", token_mod);
 
-    var parser_mod = b.addModule("parser", .{
+    const parser_mod = b.addModule("parser", .{
         .root_source_file = b.path("src/assembler/parser/parser.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "token", .module = token_mod },
+            .{ .name = "statement", .module = statement_mod },
+            .{ .name = "instruction", .module = instructions_mod },
+        },
     });
-    parser_mod.addImport("token", token_mod);
-    parser_mod.addImport("statement", statement_mod);
-    parser_mod.addImport("instruction", instructions_mod);
+
+    const compiler_mod = b.addModule("compiler", .{
+        .root_source_file = b.path("src/assembler/compiler/compiler.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "statement", .module = statement_mod },
+            .{ .name = "instruction", .module = instructions_mod },
+        },
+    });
+
+    const assembler_mod = b.addModule("assember", .{
+        .root_source_file = b.path("src/assembler/assembler.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "scanner", .module = scanner_mod },
+            .{ .name = "parser", .module = parser_mod },
+            .{ .name = "compiler", .module = compiler_mod },
+        },
+    });
+
+    _ = assembler_mod;
+
+    const vm_mod = b.addModule("vm", .{
+        .root_source_file = b.path("src/vm/vm.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "instruction", .module = instructions_mod },
+        },
+    });
 
     // EXECUTABLE:
 
@@ -83,30 +123,61 @@ pub fn build(b: *std.Build) void {
     // });
     // const run_exe_tests = b.addRunArtifact(exe_tests);
 
-    var scanner_tests = b.addTest(.{
+    const scanner_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tests/scanner_test.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "scanner", .module = scanner_mod },
+                .{ .name = "token", .module = token_mod },
+            },
         }),
     });
-    scanner_tests.root_module.addImport("scanner", scanner_mod);
-    scanner_tests.root_module.addImport("token", token_mod);
     const run_scanner_tests = b.addRunArtifact(scanner_tests);
 
-    var parser_tests = b.addTest(.{
+    const parser_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tests/parser_test.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "parser", .module = parser_mod },
+                .{ .name = "token", .module = token_mod },
+                .{ .name = "util", .module = util_mod },
+                .{ .name = "instruction", .module = instructions_mod },
+                .{ .name = "statement", .module = statement_mod },
+            },
         }),
     });
-    parser_tests.root_module.addImport("parser", parser_mod);
-    parser_tests.root_module.addImport("token", token_mod);
-    parser_tests.root_module.addImport("util", util_mod);
-    parser_tests.root_module.addImport("instruction", instructions_mod);
-    parser_tests.root_module.addImport("statement", statement_mod);
     const run_parser_tests = b.addRunArtifact(parser_tests);
+
+    const compiler_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests/compiler_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "compiler", .module = compiler_mod },
+                .{ .name = "instruction", .module = instructions_mod },
+                .{ .name = "statement", .module = statement_mod },
+            },
+        }),
+    });
+    const run_compiler_tests = b.addRunArtifact(compiler_tests);
+
+    const vm_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests/vm_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "vm", .module = vm_mod },
+                .{ .name = "instruction", .module = instructions_mod },
+            },
+        }),
+    });
+    const run_vm_tests = b.addRunArtifact(vm_tests);
 
     // TEST STEP:
 
@@ -114,4 +185,6 @@ pub fn build(b: *std.Build) void {
     // tests_step.dependOn(&run_exe_tests.step);
     tests_step.dependOn(&run_scanner_tests.step);
     tests_step.dependOn(&run_parser_tests.step);
+    tests_step.dependOn(&run_compiler_tests.step);
+    tests_step.dependOn(&run_vm_tests.step);
 }

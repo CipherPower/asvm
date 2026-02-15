@@ -14,7 +14,6 @@ pub const InstructionSet = enum(u8) {
     cmp,
     jg,
     jl,
-    jeq,
     jz,
     add,
     sub,
@@ -34,7 +33,7 @@ pub const InstructionSet = enum(u8) {
     lsr,
     str,
     jnz,
-    jneq,
+    hlt,
 
     const Self = @This();
 
@@ -46,7 +45,6 @@ pub const InstructionSet = enum(u8) {
         .{ "cmp", Self.cmp },
         .{ "jg", Self.jg },
         .{ "jl", Self.jl },
-        .{ "jeq", Self.jeq },
         .{ "jz", Self.jz },
         .{ "add", Self.add },
         .{ "sub", Self.sub },
@@ -66,7 +64,7 @@ pub const InstructionSet = enum(u8) {
         .{ "lsr", Self.lsr },
         .{ "str", Self.str },
         .{ "jnz", Self.jnz },
-        .{ "jneq", Self.jneq },
+        .{ "hlt", Self.hlt },
     });
 
     pub fn toByte(self: Self) u8 {
@@ -82,12 +80,22 @@ pub const AddressingMode = enum(u8) {
 
     const Self = @This();
 
+    pub fn fromByte(byte: u8) ?Self {
+        return switch (byte) {
+            0 => .immediate,
+            1 => .memory,
+            2 => .register,
+            3 => .indirect,
+            else => null,
+        };
+    }
+
     pub fn toByte(self: Self) u8 {
         return @intFromEnum(self);
     }
 };
 
-const InstructionHeader = struct {
+pub const InstructionHeader = struct {
     value: u8,
 
     const Self = @This();

@@ -21,7 +21,7 @@ const DirectiveTag = statement.DirectiveTag;
 const resolveDirective = statement.resolveDirective;
 
 pub const Parser = struct {
-    tokens: []Token,
+    tokens: []const Token,
     statements: std.ArrayList(Statement),
     errors: std.ArrayList(ParserError),
     current: usize,
@@ -50,7 +50,7 @@ pub const Parser = struct {
         self.errors.deinit(self.allocator);
     }
 
-    pub fn parse(self: *Self, tokens: []Token) error{OutOfMemory}!void {
+    pub fn parse(self: *Self, tokens: []const Token) error{OutOfMemory}!void {
         self.clear();
         self.tokens = tokens;
 
@@ -90,10 +90,16 @@ pub const Parser = struct {
         return self.errors.items.len > 0;
     }
 
+    pub fn handleErrors(self: *const Self, writer: *std.Io.Writer) !void {
+        for (self.errors.items) |err| {
+            try writer.print("{f}\n", .{err});
+        }
+    }
+
     fn directive(self: *Self) ParserErrorKind!void {
         _ = self.next();
 
-        const name_token: *Token = try self.expectIdentifier();
+        const name_token: *const Token = try self.expectIdentifier();
 
         const tag: DirectiveTag = resolveDirective(name_token.kind.identifier) orelse {
             const error_message: []const u8 = try self.formatToken("Expected directive, received:", self.previous().kind);
@@ -103,7 +109,7 @@ pub const Parser = struct {
 
         switch (tag) {
             .entry => {
-                const label_token: *Token = try self.expectIdentifier();
+                const label_token: *const Token = try self.expectIdentifier();
                 try self.addStatement(.{
                     .directive = .{
                         .entry = label_token.kind.identifier,
@@ -114,7 +120,7 @@ pub const Parser = struct {
     }
 
     fn label(self: *Self) ParserErrorKind!void {
-        const ident: *Token = try self.expectIdentifier();
+        const ident: *const Token = try self.expectIdentifier();
         _ = self.next();
 
         try self.addStatement(.{
@@ -123,7 +129,7 @@ pub const Parser = struct {
     }
 
     fn instruction(self: *Self) ParserErrorKind!void {
-        const mnemonic_token: *Token = try self.expectIdentifier();
+        const mnemonic_token: *const Token = try self.expectIdentifier();
 
         const instr: InstructionSet = resolveInstruction(mnemonic_token.kind.identifier) orelse {
             const error_message: []const u8 = try self.formatToken("Unknown instruction:", self.previous().kind);
@@ -150,7 +156,7 @@ pub const Parser = struct {
     }
 
     fn operand(self: *Self) ParserErrorKind!Operand {
-        const token: *Token = self.peek();
+        const token: *const Token = self.peek();
 
         switch (token.kind) {
             .register => |reg_value| {
@@ -200,7 +206,7 @@ pub const Parser = struct {
         };
     }
 
-    fn expectIdentifier(self: *Self) ParserErrorKind!*Token {
+    fn expectIdentifier(self: *Self) ParserErrorKind!*const Token {
         if (self.peek().tag() == .identifier) {
             return self.next();
         } else {
@@ -229,7 +235,7 @@ pub const Parser = struct {
         _ = self.next();
 
         while (!self.isAtEnd()) {
-            const token: *Token = self.peek();
+            const token: *const Token = self.peek();
 
             switch (token.tag()) {
                 .dot => return,
@@ -260,7 +266,7 @@ pub const Parser = struct {
         return self.peek().tag() == kind;
     }
 
-    fn peekNext(self: *const Self) *Token {
+    fn peekNext(self: *const Self) *const Token {
         if (self.current + 1 >= self.tokens.len) {
             return &self.tokens[self.tokens.len - 1];
         }
@@ -268,7 +274,7 @@ pub const Parser = struct {
         return &self.tokens[self.current + 1];
     }
 
-    fn next(self: *Self) *Token {
+    fn next(self: *Self) *const Token {
         if (!self.isAtEnd()) {
             self.current += 1;
         }
@@ -276,11 +282,11 @@ pub const Parser = struct {
         return self.previous();
     }
 
-    fn peek(self: *const Self) *Token {
+    fn peek(self: *const Self) *const Token {
         return &self.tokens[self.current];
     }
 
-    fn previous(self: *const Self) *Token {
+    fn previous(self: *const Self) *const Token {
         return &self.tokens[self.current - 1];
     }
 

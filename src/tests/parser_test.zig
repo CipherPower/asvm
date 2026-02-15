@@ -35,7 +35,7 @@ test "parsing entry directive" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(!parser.hasErrors());
     try assertEqual(expected, parser.statements.items);
@@ -60,7 +60,7 @@ test "parsing labels" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(!parser.hasErrors());
     try assertEqual(expected, parser.statements.items);
@@ -96,7 +96,7 @@ test "parsing instructions" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(!parser.hasErrors());
     try assertEqual(expected, parser.statements.items);
@@ -136,7 +136,7 @@ test "parsing program structure" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(!parser.hasErrors());
     try assertEqual(expected, parser.statements.items);
@@ -154,7 +154,7 @@ test "parsing unknown instructions" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(parser.hasErrors());
     try assert(parser.errors.items[0].kind == ParserErrorKind.UnrecognisedInstruction);
@@ -177,7 +177,7 @@ test "parsing unexpected token" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(parser.hasErrors());
     try assert(parser.errors.items[0].kind == ParserErrorKind.UnexpectedToken);
@@ -200,7 +200,7 @@ test "parsing zero operand instructions" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(!parser.hasErrors());
     try assertEqual(expected, parser.statements.items);
@@ -219,7 +219,7 @@ test "parser trailing comma error" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(parser.hasErrors());
     try assert(parser.errors.items[0].kind == ParserErrorKind.UnexpectedOperand);
@@ -244,7 +244,7 @@ test "parser error recovery multiple" {
     var parser: Parser = .init(testing.allocator);
     defer parser.deinit();
 
-    try parser.parse(@constCast(input));
+    try parser.parse(input);
 
     try assert(parser.hasErrors());
     try assert(parser.errors.items.len == 2);
