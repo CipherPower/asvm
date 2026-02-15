@@ -28,6 +28,20 @@ fn truncateDword(comptime T: type, dword: i32) T {
     return @truncate(@as(u32, @bitCast(dword)));
 }
 
+pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError, writer: *std.Io.Writer) !void {
+    const error_message: []const u8 = switch (err) {
+        error.DivideByZero => "Attempted to divide by zero",
+        error.InvalidAddressingMode => "Invalid addressing mode for instruction",
+        error.InvalidOpcode => "Unknown instruction",
+        error.InvalidRegister => "Invalid register (0 -> 15)",
+        error.MemoryOutOfBounds => "Segmentation fault",
+        error.StackOverflow => "Stack overflow",
+        error.StackUndeflow => "Stack underflow",
+    };
+
+    try writer.print("0x{x}: {s}.\n", .{ vm.pc, error_message });
+}
+
 pub const VirtualMachine = struct {
     memory: []u8,
     registers: [MAX_REGISTERS]i32,

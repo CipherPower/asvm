@@ -8,7 +8,7 @@ const ScannerError = errors.ScannerError;
 const Token = token.Token;
 const TokenKind = token.TokenKind;
 
-const VM_MAX_REGISTERS: comptime_int = 8;
+const VM_MAX_REGISTERS: comptime_int = @import("vm").MAX_REGISTERS;
 
 fn isAlphanumeric(char: u8) bool {
     return std.ascii.isAlphanumeric(char) or char == '_';
@@ -116,6 +116,8 @@ pub const Scanner = struct {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
         }
+
+        try writer.flush();
     }
 
     fn number(self: *Self, base: u8) ScannerErrorKind!void {

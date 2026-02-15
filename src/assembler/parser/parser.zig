@@ -94,6 +94,8 @@ pub const Parser = struct {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
         }
+
+        try writer.flush();
     }
 
     fn directive(self: *Self) ParserErrorKind!void {

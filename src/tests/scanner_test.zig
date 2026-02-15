@@ -21,7 +21,7 @@ test "empty scanner" {
 test "scanning comments and whitespace" {
     const input: []const u8 =
         \\; this is a comment
-        \\      
+        \\
         \\    ; this is also a comment
     ;
 
@@ -168,7 +168,7 @@ test "scanning string literals" {
 }
 
 test "scanning bad input" {
-    const input: []const u8 = "0x r10";
+    const input: []const u8 = "0x r100";
 
     var scanner: Scanner = .init(testing.allocator);
     defer scanner.deinit();

@@ -12,11 +12,10 @@ pub const Assembler = struct {
     allocator: std.mem.Allocator,
 
     stderr: *std.Io.Writer,
-    stdout: *std.Io.Writer,
 
     const Self = @This();
 
-    pub fn init(alloc: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) Self {
+    pub fn init(alloc: std.mem.Allocator, stderr: *std.Io.Writer) Self {
         return .{
             .scanner = .init(alloc),
             .parser = .init(alloc),
@@ -25,7 +24,6 @@ pub const Assembler = struct {
             .allocator = alloc,
 
             .stderr = stderr,
-            .stdout = stdout,
         };
     }
 
@@ -35,5 +33,25 @@ pub const Assembler = struct {
         self.compiler.deinit();
     }
 
-    pub fn assemble(file: *std.fs.File, file_name: ?[]const u8) !void {}
+    pub fn assemble(self: *Self, source_code: []const u8) !?[]u8 {
+        try self.scanner.scan(source_code);
+        if (self.scanner.hasErrors()) {
+            try self.scanner.handleErrors(self.stderr);
+            return null;
+        }
+
+        try self.parser.parse(self.scanner.tokens.items);
+        if (self.parser.hasErrors()) {
+            try self.parser.handleErrors(self.stderr);
+            return null;
+        }
+
+        try self.compiler.compile(self.parser.statements.items);
+        if (self.compiler.hasErrors()) {
+            try self.compiler.handleErrors(self.stderr);
+            return null;
+        }
+
+        return self.compiler.output.items;
+    }
 };

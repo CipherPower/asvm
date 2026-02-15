@@ -39,15 +39,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const scanner_mod = b.addModule("scanner", .{
-        .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "token", .module = token_mod },
-        },
-    });
-
     const parser_mod = b.addModule("parser", .{
         .root_source_file = b.path("src/assembler/parser/parser.zig"),
         .target = target,
@@ -69,6 +60,25 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const vm_mod = b.addModule("vm", .{
+        .root_source_file = b.path("src/vm/vm.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "instruction", .module = instructions_mod },
+        },
+    });
+
+    const scanner_mod = b.addModule("scanner", .{
+        .root_source_file = b.path("src/assembler/scanner/scanner.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "token", .module = token_mod },
+            .{ .name = "vm", .module = vm_mod },
+        },
+    });
+
     const assembler_mod = b.addModule("assember", .{
         .root_source_file = b.path("src/assembler/assembler.zig"),
         .target = target,
@@ -80,17 +90,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    _ = assembler_mod;
-
-    const vm_mod = b.addModule("vm", .{
-        .root_source_file = b.path("src/vm/vm.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "instruction", .module = instructions_mod },
-        },
-    });
-
     // EXECUTABLE:
 
     const exe = b.addExecutable(.{
@@ -99,7 +98,10 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{},
+            .imports = &.{
+                .{ .name = "assember", .module = assembler_mod },
+                .{ .name = "vm", .module = vm_mod },
+            },
         }),
     });
 

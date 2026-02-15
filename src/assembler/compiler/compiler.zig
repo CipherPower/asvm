@@ -197,6 +197,8 @@ pub const Compiler = struct {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
         }
+
+        try writer.flush();
     }
 
     fn addError(self: *Self, kind: CompilerErrorKind, literal: []const u8, line: usize) error{OutOfMemory}!void {
