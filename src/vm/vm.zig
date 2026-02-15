@@ -115,7 +115,9 @@ pub const VirtualMachine = struct {
         }
     }
 
-    // FDE OPERATIONS:
+    // ========================================================================================
+    //                                  FDE OPERATIONS
+    // ========================================================================================
 
     fn step(self: *Self) VirtualError!void {
         const instruction_header: u8 = try self.fetchByte();
@@ -132,7 +134,9 @@ pub const VirtualMachine = struct {
         try handler(self, mode);
     }
 
-    // FETCH OPERATIONS:
+    // ========================================================================================
+    //                                  FETCH OPERATIONS
+    // ========================================================================================
 
     fn fetchByte(self: *Self) VirtualError!u8 {
         if (self.pc >= self.memory.len) return error.MemoryOutOfBounds;
@@ -174,14 +178,18 @@ pub const VirtualMachine = struct {
         }
     }
 
-    // MEMORY OPERATIONS:
+    // ========================================================================================
+    //                                  MEMORY OPERATIONS
+    // ========================================================================================
 
     fn readDword(self: *Self, address: u16) VirtualError!i32 {
         if (address >= self.memory.len - 3) return error.MemoryOutOfBounds;
         return std.mem.readInt(i32, self.memory[address..][0..4], .little);
     }
 
-    // STACK OPERATIONS:
+    // ========================================================================================
+    //                                  STACK OPERATIONS
+    // ========================================================================================
 
     fn stackPushDword(self: *Self, value: i32) VirtualError!void {
         self.sp -%= 4;
