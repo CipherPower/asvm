@@ -10,9 +10,9 @@ pub fn main() !void {
     var stderr_writer: std.fs.File.Writer = std.fs.File.stderr().writer(&stderr_buffer);
     const stderr: *std.Io.Writer = &stderr_writer.interface;
 
-    // var stdout_buffer: [128]u8 = undefined;
-    // var stdout_writer: std.fs.File.Writer = std.fs.File.stdout().writer(&stdout_buffer);
-    // const stdout: *std.Io.Writer = &stdout_writer.interface;
+    var stdout_buffer: [128]u8 = undefined;
+    var stdout_writer: std.fs.File.Writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout: *std.Io.Writer = &stdout_writer.interface;
 
     const allocator: std.mem.Allocator = std.heap.smp_allocator;
 
@@ -53,7 +53,7 @@ pub fn main() !void {
             return;
         };
 
-        var vm: VirtualMachine = VirtualMachine.init(allocator) catch {
+        var vm: VirtualMachine = VirtualMachine.init(allocator, stdout, stderr) catch {
             try stderr.writeAll("ERROR: Could not allocate enough memory for Virtual address space.\n");
             try stderr.flush();
             return;
@@ -61,13 +61,13 @@ pub fn main() !void {
         defer vm.deinit();
 
         vm.loadProgram(bytecode) catch |err| {
-            try handleVmError(&vm, err, stderr);
+            try handleVmError(&vm, err);
             try stderr.flush();
             return;
         };
 
         vm.run() catch |err| {
-            try handleVmError(&vm, err, stderr);
+            try handleVmError(&vm, err);
             try stderr.flush();
             return;
         };

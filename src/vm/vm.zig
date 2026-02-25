@@ -1,8 +1,10 @@
 const std = @import("std");
 const errors = @import("error.zig");
 const instruction_set = @import("instruction");
+const syscalls = @import("syscall.zig");
 
 const VirtualError = errors.VirtualError;
+pub const handleVmError = errors.handleVmError;
 
 const InstructionSet = instruction_set.InstructionSet;
 const AddressingMode = instruction_set.AddressingMode;
@@ -24,23 +26,8 @@ fn checkRegister(register: u8) VirtualError!void {
     if (register >= MAX_REGISTERS) return error.InvalidRegister;
 }
 
-fn truncateDword(comptime T: type, dword: i32) T {
+pub fn truncateDword(comptime T: type, dword: i32) T {
     return @truncate(@as(u32, @bitCast(dword)));
-}
-
-pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError, writer: *std.Io.Writer) !void {
-    const error_message: []const u8 = switch (err) {
-        error.DivideByZero => "Attempted to divide by zero",
-        error.InvalidAddressingMode => "Invalid addressing mode for instruction",
-        error.InvalidOpcode => "Unknown instruction",
-        error.InvalidRegister => "Invalid register (0 -> 15)",
-        error.MemoryOutOfBounds => "Segmentation fault",
-        error.StackOverflow => "Stack overflow",
-        error.UnknownSyscall => "Unrecognised syscall id",
-        error.StackUndeflow => "Stack underflow",
-    };
-
-    try writer.print("0x{x}: {s}.\n", .{ vm.pc, error_message });
 }
 
 pub const VirtualMachine = struct {
@@ -50,19 +37,21 @@ pub const VirtualMachine = struct {
     sp: u16,
     flags: u8,
     running: bool,
+    stdout: *std.Io.Writer,
+    stderr: *std.Io.Writer,
     allocator: std.mem.Allocator,
 
     const Self = @This();
 
     const InstructionHandler: type = *const fn (self: *Self, mode: AddressingMode) VirtualError!void;
-    const InstructionCount: usize = @typeInfo(InstructionSet).@"enum".fields.len;
+    const INSTRUCTION_COUNT: usize = @typeInfo(InstructionSet).@"enum".fields.len;
 
     // FLAG MASKS:
     const FLAG_Z: u8 = 1 << 0;
     const FLAG_S: u8 = 1 << 1;
 
-    const dispatch_table: [InstructionCount]InstructionHandler = build_table: {
-        var table: [InstructionCount]InstructionHandler = undefined;
+    const dispatch_table: [INSTRUCTION_COUNT]InstructionHandler = build_table: {
+        var table: [INSTRUCTION_COUNT]InstructionHandler = undefined;
 
         table[@intFromEnum(InstructionSet.mov)] = &handleMov;
         table[@intFromEnum(InstructionSet.push)] = &handlePush;
@@ -96,7 +85,7 @@ pub const VirtualMachine = struct {
         break :build_table table;
     };
 
-    pub fn init(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
+    pub fn init(allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) error{OutOfMemory}!Self {
         const mem: []u8 = try allocator.alloc(u8, MEMORY_SIZE);
         @memset(mem, 0);
 
@@ -107,6 +96,8 @@ pub const VirtualMachine = struct {
             .sp = 0,
             .flags = 0,
             .running = false,
+            .stdout = stdout,
+            .stderr = stderr,
             .allocator = allocator,
         };
     }
@@ -154,28 +145,28 @@ pub const VirtualMachine = struct {
     //                                  FETCH OPERATIONS
     // ========================================================================================
 
-    fn fetchByte(self: *Self) VirtualError!u8 {
+    pub fn fetchByte(self: *Self) VirtualError!u8 {
         if (self.pc >= self.memory.len) return error.MemoryOutOfBounds;
         const value: u8 = self.memory[self.pc];
         self.pc +%= 1;
         return value;
     }
 
-    fn fetchWord(self: *Self) VirtualError!u16 {
+    pub fn fetchWord(self: *Self) VirtualError!u16 {
         if (self.pc >= self.memory.len - 1) return error.MemoryOutOfBounds;
         const value: u16 = std.mem.readInt(u16, self.memory[self.pc..][0..2], .little);
         self.pc +%= 2;
         return value;
     }
 
-    fn fetchDword(self: *Self) VirtualError!i32 {
+    pub fn fetchDword(self: *Self) VirtualError!i32 {
         if (self.pc >= self.memory.len - 3) return error.MemoryOutOfBounds;
         const value: i32 = std.mem.readInt(i32, self.memory[self.pc..][0..4], .little);
         self.pc +%= 4;
         return value;
     }
 
-    fn fetchSrcValue(self: *Self, mode: AddressingMode) VirtualError!i32 {
+    pub fn fetchSrcValue(self: *Self, mode: AddressingMode) VirtualError!i32 {
         switch (mode) {
             .immediate => return try self.fetchDword(),
 
@@ -198,7 +189,7 @@ pub const VirtualMachine = struct {
     //                                  MEMORY OPERATIONS
     // ========================================================================================
 
-    fn readDword(self: *Self, address: u16) VirtualError!i32 {
+    pub fn readDword(self: *Self, address: u16) VirtualError!i32 {
         if (address >= self.memory.len - 3) return error.MemoryOutOfBounds;
         return std.mem.readInt(i32, self.memory[address..][0..4], .little);
     }
@@ -207,12 +198,12 @@ pub const VirtualMachine = struct {
     //                                  STACK OPERATIONS
     // ========================================================================================
 
-    fn stackPushDword(self: *Self, value: i32) VirtualError!void {
+    pub fn stackPushDword(self: *Self, value: i32) VirtualError!void {
         self.sp -%= 4;
         std.mem.writeInt(i32, self.memory[self.sp..][0..4], value, .little);
     }
 
-    fn stackPopDword(self: *Self) VirtualError!i32 {
+    pub fn stackPopDword(self: *Self) VirtualError!i32 {
         const value: i32 = std.mem.readInt(i32, self.memory[self.sp..][0..4], .little);
         self.sp +%= 4;
         return value;
@@ -294,7 +285,7 @@ pub const VirtualMachine = struct {
         const value: i32 = try self.fetchSrcValue(mode);
         if (value == 0) return error.DivideByZero;
 
-        self.registers[dest_register] = @divExact(self.registers[dest_register], value);
+        self.registers[dest_register] = @divTrunc(self.registers[dest_register], value);
     }
 
     fn handleInc(self: *Self, mode: AddressingMode) VirtualError!void {
@@ -427,33 +418,11 @@ pub const VirtualMachine = struct {
         _ = mode;
 
         const syscall_id: i32 = self.registers[0];
-        const arg1: i32 = self.registers[1];
+        if (syscall_id < 0 or syscall_id >= syscalls.SYSCALL_COUNT) return error.MemoryOutOfBounds;
 
-        switch (syscall_id) {
-            1 => {
-                std.debug.print("{d}", .{arg1});
-            },
+        const syscall_fn: syscalls.SyscallHandler = syscalls.syscall_table[@intCast(syscall_id)];
 
-            2 => {
-                const char: u8 = truncateDword(u8, arg1);
-                std.debug.print("{c}", .{char});
-            },
-
-            3 => {
-                var addr: u16 = truncateDword(u16, arg1);
-                while (addr < self.memory.len) : (addr +%= 1) {
-                    const char: u8 = self.memory[addr];
-                    if (char == 0) break;
-                    std.debug.print("{c}", .{char});
-                }
-            },
-
-            4 => {
-                std.debug.print("\n", .{});
-            },
-
-            else => return error.UnknownSyscall,
-        }
+        try syscall_fn(self);
     }
 
     fn handleLea(self: *Self, mode: AddressingMode) VirtualError!void {

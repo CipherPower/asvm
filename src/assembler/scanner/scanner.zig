@@ -157,6 +157,13 @@ pub const Scanner = struct {
     fn integer(self: *Self) ScannerErrorKind!void {
         const first_digit: u8 = self.previous();
 
+        if (first_digit == '0') {
+            switch (self.peek()) {
+                ' ', '\t', '\r', '\n' => return try self.number(10),
+                else => {},
+            }
+        }
+
         if (first_digit == '0' and !self.isAtEnd()) {
             switch (self.peek()) {
                 'x' => {
