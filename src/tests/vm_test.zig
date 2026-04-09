@@ -11,6 +11,15 @@ const InstructionSet = instruction_set.InstructionSet;
 const InstructionHeader = instruction_set.InstructionHeader;
 const AddressingMode = instruction_set.AddressingMode;
 
+var stdout_writer: std.fs.File.Writer = std.fs.File.stdout().writer(&.{});
+const stdout: *std.Io.Writer = &stdout_writer.interface;
+
+var stderr_writer: std.fs.File.Writer = std.fs.File.stderr().writer(&.{});
+const stderr: *std.Io.Writer = &stderr_writer.interface;
+
+var stdin_reader: std.fs.File.Reader = std.fs.File.stdin().reader(&.{});
+const stdin: *std.Io.Reader = &stdin_reader.interface;
+
 fn printPass(test_name: []const u8) void {
     std.debug.print("test: \"{s}\" passed!\n", .{test_name});
 }
@@ -30,7 +39,7 @@ fn int(val: i32) [@sizeOf(i32)]u8 {
 test "empty vm" {
     const program: []const u8 = &.{};
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program);
@@ -53,7 +62,7 @@ test "running mov immediate and add register" {
     try program.append(testing.allocator, 1);
     try program.append(testing.allocator, instr(.hlt, .immediate));
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program.items);
@@ -85,7 +94,7 @@ test "math operations (sub, mul, div)" {
     try program.append(testing.allocator, 1);
     try program.append(testing.allocator, instr(.hlt, .immediate));
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program.items);
@@ -118,7 +127,7 @@ test "bitwise logic and left shift" {
     try program.append(testing.allocator, 2);
     try program.append(testing.allocator, instr(.hlt, .immediate));
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program.items);
@@ -145,7 +154,7 @@ test "stack push and pop (downward growth verification)" {
     try program.append(testing.allocator, 1);
     try program.append(testing.allocator, instr(.hlt, .immediate));
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program.items);
@@ -181,7 +190,7 @@ test "control flow (call, ret, cmp, jeq)" {
     try program.appendSlice(testing.allocator, &int(42));
     try program.append(testing.allocator, instr(.ret, .immediate));
 
-    var vm: VirtualMachine = try .init(testing.allocator);
+    var vm: VirtualMachine = try .init(testing.allocator, stdout, stderr, stdin);
     defer vm.deinit();
 
     try vm.loadProgram(program.items);

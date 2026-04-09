@@ -4,6 +4,7 @@ const Scanner = @import("scanner").Scanner;
 const Parser = @import("parser").Parser;
 const Compiler = @import("compiler").Compiler;
 
+/// Wrapper struct that facilitates conversion from a string into bytes.
 pub const Assembler = struct {
     scanner: Scanner,
     parser: Parser,
@@ -15,6 +16,7 @@ pub const Assembler = struct {
 
     const Self = @This();
 
+    /// Instantiates a new assembler instance.
     pub fn init(alloc: std.mem.Allocator, stderr: *std.Io.Writer) Self {
         return .{
             .scanner = .init(alloc),
@@ -27,12 +29,15 @@ pub const Assembler = struct {
         };
     }
 
+    /// Deallocates all components of the assembler.
     pub fn deinit(self: *Self) void {
         self.scanner.deinit();
         self.parser.deinit();
         self.compiler.deinit();
     }
 
+    /// Wrapper function over the individual methods that facilitate conversion,
+    /// Returning an out of memory error, or null if there was any errors.
     pub fn assemble(self: *Self, source_code: []const u8) !?[]u8 {
         try self.scanner.scan(source_code);
         if (self.scanner.hasErrors()) {

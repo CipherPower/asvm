@@ -1,20 +1,45 @@
 const std = @import("std");
 
 pub const CompilerErrorKind = error{
+    /// Occurs when there is more than one ".entry" directives in the input file.
     DuplicateEntryDirective,
+
+    /// Occurs when there is no ".entry" directive in the input file.
     MissingEntryDirective,
+
+    /// Occurs when a label that has been used has not been declared/defined.
     UndefinedLabel,
+
+    /// Occurs when a label is declared/defined two or more times.
     RedefinedLabel,
+
+    /// Occurs when the addressing mode for the instruction is invalid.
     InvalidAddressingMode,
+
+    /// Occurs when the operands for a given instruction are invalid.
     InvalidOperand,
+
+    /// Occurs when there are duplicate ".segment" directives.
     DuplicateSegment,
+
+    /// Occurs when there is no .segment .text directive
     MissingTextSegment,
+
+    /// Occurs when a directive that is exclusive to a certain segment is used
+    /// outside of that segment.
     DirectiveOutsideDataSegment,
+
+    /// Occurs when an instruction is used outside of a ".text" segment.
     InstructionOutsideTextSegment,
+
+    /// Occurs when a segment is not valid.
     InvalidSegment,
+
+    /// Occurs when the OS raises an out-of-memory exception.
     OutOfMemory,
 };
 
+/// Wrapper struct for storing a Compiler error.
 pub const CompilerError = struct {
     kind: CompilerErrorKind,
     literal: []const u8,

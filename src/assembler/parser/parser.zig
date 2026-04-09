@@ -1,3 +1,5 @@
+//! Provides utility for converting a series of tokens into a series of Statements
+
 const std = @import("std");
 const errors = @import("error.zig");
 const statement = @import("statement");
@@ -20,6 +22,7 @@ const Operand = statement.Operand;
 const DirectiveTag = statement.DirectiveTag;
 const resolveDirective = statement.resolveDirective;
 
+/// A struct that facilitates conversion from tokens to statements.
 pub const Parser = struct {
     tokens: []const Token,
     statements: std.ArrayList(Statement),
@@ -29,6 +32,7 @@ pub const Parser = struct {
 
     const Self = @This();
 
+    /// Instantiates a Parser instance.
     pub fn init(allocator: std.mem.Allocator) Self {
         return .{
             .tokens = undefined,
@@ -39,6 +43,7 @@ pub const Parser = struct {
         };
     }
 
+    // Frees all memory allocated during parsing.
     pub fn deinit(self: *Self) void {
         if (self.hasErrors()) {
             for (self.errors.items) |err| {
@@ -50,6 +55,7 @@ pub const Parser = struct {
         self.errors.deinit(self.allocator);
     }
 
+    /// Initiates parsing from tokens to Statements.
     pub fn parse(self: *Self, tokens: []const Token) error{OutOfMemory}!void {
         self.clear();
         self.tokens = tokens;
@@ -62,6 +68,7 @@ pub const Parser = struct {
         }
     }
 
+    /// Maps one or more tokens into a single statement.
     fn parseStatement(self: *Self) ParserErrorKind!void {
         switch (self.peek().tag()) {
             .dot => try self.directive(),
@@ -90,10 +97,13 @@ pub const Parser = struct {
         }
     }
 
+    /// wrapper for checking if the parser encountered any errors.
     pub fn hasErrors(self: *const Self) bool {
         return self.errors.items.len > 0;
     }
 
+    /// utility for outputting the errors encountered during parsing to a given
+    /// writer.
     pub fn handleErrors(self: *const Self, writer: *std.Io.Writer) !void {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
@@ -102,6 +112,7 @@ pub const Parser = struct {
         try writer.flush();
     }
 
+    /// Parses a directive segment.
     fn segmentDirective(self: *Self) ParserErrorKind!void {
         _ = self.next();
 
@@ -121,6 +132,7 @@ pub const Parser = struct {
         }
     }
 
+    /// parses a directive.
     fn directive(self: *Self) ParserErrorKind!void {
         _ = self.next();
 
@@ -157,6 +169,7 @@ pub const Parser = struct {
         }
     }
 
+    /// parses a label
     fn label(self: *Self) ParserErrorKind!void {
         const ident: *const Token = try self.expectIdentifier();
         _ = self.next();
@@ -166,6 +179,7 @@ pub const Parser = struct {
         });
     }
 
+    /// parses an instruction.
     fn instruction(self: *Self) ParserErrorKind!void {
         const mnemonic_token: *const Token = try self.expectIdentifier();
 
@@ -193,6 +207,7 @@ pub const Parser = struct {
         });
     }
 
+    /// parses an operand.
     fn operand(self: *Self) ParserErrorKind!Operand {
         const token: *const Token = self.peek();
 
@@ -204,7 +219,7 @@ pub const Parser = struct {
 
             .integer => |int_value| {
                 _ = self.next();
-                return .{ .integer = int_value };
+                return .{ .address = @truncate(@as(u32, @bitCast(int_value))) };
             },
 
             .hashtag => {
@@ -233,6 +248,8 @@ pub const Parser = struct {
         }
     }
 
+    /// checks if the tokens currently being parsed
+    /// is part of a new statement.
     fn isNewStatement(self: *const Self, current_line: usize) bool {
         if (self.peek().line > current_line) return true;
 
@@ -244,6 +261,7 @@ pub const Parser = struct {
         };
     }
 
+    /// expects an identifier token, emitting an error if otherwise.
     fn expectIdentifier(self: *Self) ParserErrorKind!*const Token {
         if (self.peek().tag() == .identifier) {
             return self.next();
@@ -254,11 +272,13 @@ pub const Parser = struct {
         }
     }
 
+    /// wrapper function for adding statements to the statement list.
     fn addStatement(self: *Self, kind: StatementKind) ParserErrorKind!void {
         const stmt: Statement = .init(kind, self.previous().line);
         try self.statements.append(self.allocator, stmt);
     }
 
+    /// wrapper for creating an emitting an error.
     fn addError(self: *Self, kind: ParserErrorKind, literal: []const u8) ParserErrorKind!void {
         const err: ParserError = .{
             .kind = kind,
@@ -269,6 +289,7 @@ pub const Parser = struct {
         try self.errors.append(self.allocator, err);
     }
 
+    /// synchronises the parsing after encountering an error.
     fn sync(self: *Self) void {
         _ = self.next();
 
@@ -290,6 +311,7 @@ pub const Parser = struct {
         }
     }
 
+    /// utility for expecting a specific type of token.
     fn match(self: *Self, kind: TokenKindTag) bool {
         if (self.check(kind)) {
             _ = self.next();
@@ -299,11 +321,13 @@ pub const Parser = struct {
         }
     }
 
+    /// checks that a token is of a certain kind.
     fn check(self: *Self, kind: TokenKindTag) bool {
         if (self.isAtEnd()) return false;
         return self.peek().tag() == kind;
     }
 
+    /// Utility for peeking at the next Token.
     fn peekNext(self: *const Self) *const Token {
         if (self.current + 1 >= self.tokens.len) {
             return &self.tokens[self.tokens.len - 1];
@@ -312,6 +336,7 @@ pub const Parser = struct {
         return &self.tokens[self.current + 1];
     }
 
+    /// Utility for advancing to the next token.
     fn next(self: *Self) *const Token {
         if (!self.isAtEnd()) {
             self.current += 1;
@@ -320,23 +345,28 @@ pub const Parser = struct {
         return self.previous();
     }
 
+    /// Utility for peeking at the current token.
     fn peek(self: *const Self) *const Token {
         return &self.tokens[self.current];
     }
 
+    /// Utility for checking the previous token.
     fn previous(self: *const Self) *const Token {
         return &self.tokens[self.current - 1];
     }
 
+    /// Checks if the parser has reached the end of the input.
     fn isAtEnd(self: *const Self) bool {
         return self.current >= self.tokens.len;
     }
 
+    /// formats a token into a string.
     fn formatToken(self: *const Self, msg: []const u8, token: TokenKind) ParserErrorKind![]const u8 {
         const message: []const u8 = try std.fmt.allocPrint(self.allocator, "{s} {f}", .{ msg, token });
         return message;
     }
 
+    /// clears the parser.
     fn clear(self: *Self) void {
         if (self.hasErrors()) {
             for (self.errors.items) |err| {

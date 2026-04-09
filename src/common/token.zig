@@ -1,5 +1,6 @@
 const std = @import("std");
 
+/// Tag used for the TokenKind
 pub const TokenKindTag = enum {
     identifier,
     integer,
@@ -18,6 +19,7 @@ pub const TokenKindTag = enum {
     eof,
 };
 
+/// A tagged union that defines all possible token types.
 pub const TokenKind = union(TokenKindTag) {
     identifier: []const u8,
     integer: i32,
@@ -58,6 +60,8 @@ pub const TokenKind = union(TokenKindTag) {
     }
 };
 
+// Wrapper struct over the token kind that adds more metadata such as
+// the line it was constructed from.
 pub const Token = struct {
     kind: TokenKind,
     line: usize,

@@ -13,6 +13,7 @@ pub const VirtualError = error{
     StackUndeflow,
     InvalidSyscallArguments,
     WriteError,
+    ReadError,
 };
 
 pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError) !void {
@@ -27,6 +28,7 @@ pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError) !void {
         error.StackUndeflow => "Stack underflow",
         error.InvalidSyscallArguments => "Invalid syscall arguments",
         error.WriteError => "Write error",
+        error.ReadError => "Read error",
     };
 
     try vm.stderr.print("0x{x}: {s}.\n", .{ vm.pc, error_message });

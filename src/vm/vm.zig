@@ -12,6 +12,7 @@ const AddressingMode = instruction_set.AddressingMode;
 pub const MEMORY_SIZE: comptime_int = 65536;
 pub const MAX_REGISTERS: comptime_int = 16;
 
+/// Deconstructions an InstructionHeader into an individual instruction + addressing mode.
 fn deconstructHeader(byte: u8) VirtualError!struct { InstructionSet, AddressingMode } {
     const instruction: u8 = byte >> 2;
     const mode: u8 = byte & 0b0000_0011;
@@ -22,14 +23,17 @@ fn deconstructHeader(byte: u8) VirtualError!struct { InstructionSet, AddressingM
     return .{ opcode, addressing_mode };
 }
 
-fn checkRegister(register: u8) VirtualError!void {
+/// Utility function for checking if a register is valid.
+inline fn checkRegister(register: u8) VirtualError!void {
     if (register >= MAX_REGISTERS) return error.InvalidRegister;
 }
 
+/// Utility function for converting between a signed dword to an unsigned type T.
 pub fn truncateDword(comptime T: type, dword: i32) T {
     return @truncate(@as(u32, @bitCast(dword)));
 }
 
+/// Facilitates running of bytecode using an internal address space.
 pub const VirtualMachine = struct {
     memory: []u8,
     registers: [MAX_REGISTERS]i32,
@@ -39,6 +43,7 @@ pub const VirtualMachine = struct {
     running: bool,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
+    stdin: *std.Io.Reader,
     allocator: std.mem.Allocator,
 
     const Self = @This();
@@ -85,7 +90,7 @@ pub const VirtualMachine = struct {
         break :build_table table;
     };
 
-    pub fn init(allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) error{OutOfMemory}!Self {
+    pub fn init(allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer, stdin: *std.Io.Reader) error{OutOfMemory}!Self {
         const mem: []u8 = try allocator.alloc(u8, MEMORY_SIZE);
         @memset(mem, 0);
 
@@ -98,6 +103,7 @@ pub const VirtualMachine = struct {
             .running = false,
             .stdout = stdout,
             .stderr = stderr,
+            .stdin = stdin,
             .allocator = allocator,
         };
     }

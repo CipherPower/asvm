@@ -1,3 +1,6 @@
+//! This module provides a data structure for conversion
+//! from a series of Statements to a series of bytes.
+
 const std = @import("std");
 const errors = @import("error.zig");
 const statement = @import("statement");
@@ -16,16 +19,18 @@ const Operand = statement.Operand;
 const Directive = statement.Directive;
 const DirectiveTag = statement.DirectiveTag;
 
+/// This function determines the addressing mode for a set of operands, whether valid or not.
 fn resolveAddressingMode(operands: [2]Operand) CompilerErrorKind!AddressingMode {
     return switch (operands[0]) {
         .register => switch (operands[1]) {
             .register => .register,
             .integer => .immediate,
             .label => .memory,
+            .address => .memory,
             .none => .register,
         },
 
-        .label => switch (operands[1]) {
+        .label, .address => switch (operands[1]) {
             .none => .memory,
             else => error.InvalidOperand,
         },
@@ -36,6 +41,8 @@ fn resolveAddressingMode(operands: [2]Operand) CompilerErrorKind!AddressingMode 
     };
 }
 
+// This functions calculates the instruction size based on the operands provided to it.
+// Assumes operands are valid.
 fn calculateInstructionSize(operands: [2]Operand) u16 {
     var size: u16 = 1; // 1 byte for instruction header
 
@@ -43,7 +50,7 @@ fn calculateInstructionSize(operands: [2]Operand) u16 {
         switch (op) {
             .register => size += @sizeOf(u8),
             .integer => size += @sizeOf(i32),
-            .label => size += @sizeOf(u16),
+            .label, .address => size += @sizeOf(u16),
             .none => {},
         }
     }
@@ -51,12 +58,17 @@ fn calculateInstructionSize(operands: [2]Operand) u16 {
     return size;
 }
 
+/// This enum acts as marker within the compiler,
+/// detailing which segment is currently being compiled.
 const Segment = enum {
     none,
     data,
     text,
 };
 
+/// This struct allows compilation of a series of Statements into a series of bytes.
+/// Will also do some semantic checking regarding the use of certain directives
+/// in certain segments.
 pub const Compiler = struct {
     output: std.ArrayList(u8),
     symbol_table: std.StringHashMap(u16),
@@ -70,6 +82,7 @@ pub const Compiler = struct {
 
     const Self = @This();
 
+    /// Instantiates a new compiler instance.
     pub fn init(allocator: std.mem.Allocator) Self {
         return .{
             .output = .empty,
@@ -84,16 +97,20 @@ pub const Compiler = struct {
         };
     }
 
+    /// Frees all memory allocated by the Compiler.
     pub fn deinit(self: *Self) void {
         self.output.deinit(self.allocator);
         self.errors.deinit(self.allocator);
         self.symbol_table.deinit();
     }
 
+    /// Checks if the Compiler encountered any errors
+    /// during compilation.
     pub fn hasErrors(self: *const Self) bool {
         return self.errors.items.len > 0;
     }
 
+    /// Initiates compilation.
     pub fn compile(self: *Self, statements: []const Statement) error{OutOfMemory}!void {
         self.clear();
 
@@ -104,6 +121,7 @@ pub const Compiler = struct {
         try self.passTwo(statements);
     }
 
+    /// Used to calculate offsets and does some semantic checking.
     fn passOne(self: *Self, statements: []const Statement) error{OutOfMemory}!void {
         var current_offset: u16 = 2;
 
@@ -180,6 +198,7 @@ pub const Compiler = struct {
         }
     }
 
+    /// Emits the statements as binary.
     fn passTwo(self: *Self, statements: []const Statement) error{OutOfMemory}!void {
         try self.emitBytes(&[_]u8{ 0, 0 });
 
@@ -219,6 +238,8 @@ pub const Compiler = struct {
         }
     }
 
+    /// Takes a statement as input, then emits the binary for that instruction.
+    /// Assumes the statement is an instruction.
     fn emitInstruction(self: *Self, stmt: Statement) error{OutOfMemory}!void {
         const instr = stmt.kind.instruction;
         const mode: AddressingMode = resolveAddressingMode(instr.operands) catch |err| {
@@ -248,11 +269,17 @@ pub const Compiler = struct {
                     }
                 },
 
+                .address => |addr| {
+                    const bytes: [@sizeOf(u16)]u8 = std.mem.toBytes(addr);
+                    try self.emitBytes(&bytes);
+                },
+
                 .none => {},
             }
         }
     }
 
+    /// Wrapper function for outputting all errors encountered during compilation to the given writer.
     pub fn handleErrors(self: *const Self, writer: *std.Io.Writer) !void {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
@@ -261,19 +288,23 @@ pub const Compiler = struct {
         try writer.flush();
     }
 
+    /// A utility function for adding an error to the error list within the compiler.
     fn addError(self: *Self, kind: CompilerErrorKind, literal: []const u8, line: usize) error{OutOfMemory}!void {
         const err: CompilerError = .init(kind, literal, line);
         try self.errors.append(self.allocator, err);
     }
 
+    /// Emits a byte to the output binary.
     fn emitByte(self: *Self, byte: u8) error{OutOfMemory}!void {
         try self.output.append(self.allocator, byte);
     }
 
+    /// Emits a slice of bytes to the output binary.
     fn emitBytes(self: *Self, bytes: []const u8) error{OutOfMemory}!void {
         try self.output.appendSlice(self.allocator, bytes);
     }
 
+    /// Helper function for reseting a Compiler, allowing reuse.
     fn clear(self: *Self) void {
         self.output.clearRetainingCapacity();
         self.errors.clearRetainingCapacity();

@@ -6,9 +6,12 @@ const StaticMap = @import("util").StaticMap;
 pub fn resolveDirective(str: []const u8) ?DirectiveTag {
     return Directive.table.get(str);
 }
+
+/// Tagged union that defines the different Operand types.
 pub const Operand = union(enum) {
     register: u8,
     integer: i32,
+    address: u16,
     label: []const u8,
     none,
 
@@ -19,17 +22,20 @@ pub const Operand = union(enum) {
             .register => |reg| try writer.print("operand(register = {d})", .{reg}),
             .integer => |int| try writer.print("operand(integer = {d})", .{int}),
             .label => |label| try writer.print("operand(label = {s})", .{label}),
+            .address => |addr| try writer.print("operand(address = {x})", .{addr}),
             .none => try writer.print("operand(none)"),
         }
     }
 };
 
+/// Enum used as a tag for the Directive tagged union.
 pub const DirectiveTag = enum {
     entry,
     string,
     segment,
 };
 
+/// A tagged union that defines all the possible directives and their encapsulating data.
 pub const Directive = union(enum) {
     entry: []const u8, // label
     string: []const u8,
@@ -52,6 +58,7 @@ pub const Directive = union(enum) {
     }
 };
 
+/// Tagged union used in conjunction with Statement, that defines all possible statements.
 pub const StatementKind = union(enum) {
     label: []const u8, // label
     instruction: struct {
@@ -81,6 +88,7 @@ pub const StatementKind = union(enum) {
     }
 };
 
+/// Wrapper struct that adds more metadata over the statement.
 pub const Statement = struct {
     kind: StatementKind,
     line: usize,

@@ -10,18 +10,22 @@ const TokenKind = token.TokenKind;
 
 const VM_MAX_REGISTERS: comptime_int = @import("vm").MAX_REGISTERS;
 
+/// Utility for checking if a character is alphanumeric or is an underscore
 fn isAlphanumeric(char: u8) bool {
     return std.ascii.isAlphanumeric(char) or char == '_';
 }
 
+/// Utility for checking if a character is a valid octal character.
 fn isOctal(char: u8) bool {
     return char >= '0' and char <= '7';
 }
 
+/// Utility for checking if a character is a valid binary character.
 fn isBinary(char: u8) bool {
     return char == '0' or char == '1';
 }
 
+/// Data structure for converting a text input ([]u8) into a series of tokens.
 pub const Scanner = struct {
     input: []const u8,
     start: usize,
@@ -33,6 +37,7 @@ pub const Scanner = struct {
 
     const Self = @This();
 
+    /// Instantiates a new Scanner instance.
     pub fn init(allocator: std.mem.Allocator) Self {
         return .{
             .input = undefined,
@@ -45,11 +50,13 @@ pub const Scanner = struct {
         };
     }
 
+    /// Frees all memory allocated during scanning.
     pub fn deinit(self: *Self) void {
         self.tokens.deinit(self.allocator);
         self.errors.deinit(self.allocator);
     }
 
+    /// Commences scanning of the byte slice into tokens.
     pub fn scan(self: *Self, input: []const u8) error{OutOfMemory}!void {
         self.clear();
         self.input = input;
@@ -68,6 +75,7 @@ pub const Scanner = struct {
         };
     }
 
+    /// Converts a series of bytes into a single token.
     fn scanToken(self: *Self) ScannerErrorKind!void {
         const char: u8 = self.next();
 
@@ -108,10 +116,14 @@ pub const Scanner = struct {
         }
     }
 
+    /// Wrapper for checking if the Scanner encountered any errors
+    /// during scanning.
     pub fn hasErrors(self: *const Self) bool {
         return self.errors.items.len > 0;
     }
 
+    /// Wrapper for outputting all errors encountered during scanning
+    /// to a given writer.
     pub fn handleErrors(self: *const Self, writer: *std.Io.Writer) !void {
         for (self.errors.items) |err| {
             try writer.print("{f}\n", .{err});
@@ -120,6 +132,7 @@ pub const Scanner = struct {
         try writer.flush();
     }
 
+    /// Function that parses a number of base 16, 10, 8, 2 into an Integer token.
     fn number(self: *Self, base: u8) ScannerErrorKind!void {
         while (!self.isAtEnd()) {
             const char: u8 = self.peek();
@@ -154,6 +167,7 @@ pub const Scanner = struct {
         });
     }
 
+    /// A dispatcher function that decides which base the number is.
     fn integer(self: *Self) ScannerErrorKind!void {
         const first_digit: u8 = self.previous();
 
@@ -193,6 +207,7 @@ pub const Scanner = struct {
         return try self.number(10);
     }
 
+    /// Scans an identifier.
     fn identifier(self: *Self) ScannerErrorKind!void {
         while (isAlphanumeric(self.peek()) and !self.isAtEnd()) {
             _ = self.next();
@@ -205,6 +220,8 @@ pub const Scanner = struct {
         });
     }
 
+    /// Scans an integer and takes it as a register value.
+    /// Also does some checking to ensure the register is valid.
     fn register(self: *Self) ScannerErrorKind!void {
         self.start = self.current;
 
@@ -233,6 +250,8 @@ pub const Scanner = struct {
         });
     }
 
+    /// Scans a string, checking for encapsulating quotes, making sure that the string
+    /// is not split across multiple lines.
     fn string(self: *Self) ScannerErrorKind!void {
         self.start = self.current;
 
@@ -253,6 +272,8 @@ pub const Scanner = struct {
         _ = self.next();
     }
 
+    /// Synchronises the seeking of the scanner to ensure that
+    /// there are no cascading errors after encountering an error.
     fn sync(self: *Self) void {
         while (!self.isAtEnd()) {
             if (self.previous() == '\n') return;
@@ -269,26 +290,31 @@ pub const Scanner = struct {
         }
     }
 
+    /// Seeks ahead to skip the slice referring to a comment.
     fn skipComment(self: *Self) void {
         while (self.peek() != '\n' and !self.isAtEnd()) {
             _ = self.next();
         }
     }
 
+    /// Helper function to get the slice between the start and current offset.
     fn getLiteral(self: *const Self) []const u8 {
         return self.input[self.start..self.current];
     }
 
+    /// Utility function for peeking at the previous byte.
     fn previous(self: *const Self) u8 {
-        if (self.isAtEnd()) return 0;
+        if (self.isAtEnd() or self.current - 1 < 0) return 0;
         return self.input[self.current - 1];
     }
 
+    /// Utility function for peeking at the current byte.
     fn peek(self: *const Self) u8 {
         if (self.isAtEnd()) return 0;
         return self.input[self.current];
     }
 
+    /// Utility function for creating and appending an error to the error list.
     fn addError(self: *Self, kind: ScannerErrorKind, literal: []const u8) ScannerErrorKind!void {
         const err: ScannerError = .{
             .kind = kind,
@@ -299,22 +325,27 @@ pub const Scanner = struct {
         try self.errors.append(self.allocator, err);
     }
 
+    /// Utility function for creating and appending a token to the output.
     fn addToken(self: *Self, kind: TokenKind) ScannerErrorKind!void {
         const tok: Token = .init(kind, self.line);
 
         try self.tokens.append(self.allocator, tok);
     }
 
+    /// Used to advance the scanner to the next byte.
     fn next(self: *Self) u8 {
         const char: u8 = self.input[self.current];
         self.current += 1;
         return char;
     }
 
+    /// Utility function used to check if the scanner has reached the end
+    /// of the input string.
     fn isAtEnd(self: *const Self) bool {
         return self.current >= self.input.len;
     }
 
+    /// Resets the scanner for reuse.
     fn clear(self: *Self) void {
         self.input = undefined;
         self.start = 0;

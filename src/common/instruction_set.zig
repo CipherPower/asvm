@@ -2,10 +2,13 @@ const std = @import("std");
 
 const StaticMap = @import("util").StaticMap;
 
+/// Wrapper function for converting a byte slice to an instruction set,
+/// returning null if the byte slice was invalid.
 pub fn resolveInstruction(str: []const u8) ?InstructionSet {
     return InstructionSet.table.get(str);
 }
 
+/// Enum containing all possible instructions.
 pub const InstructionSet = enum(u8) {
     mov,
     push,
@@ -74,6 +77,7 @@ pub const InstructionSet = enum(u8) {
     }
 };
 
+/// An enum that represents the different addressing modes an instruction could take.
 pub const AddressingMode = enum(u8) {
     immediate,
     memory,
@@ -82,21 +86,13 @@ pub const AddressingMode = enum(u8) {
 
     const Self = @This();
 
-    pub fn fromByte(byte: u8) ?Self {
-        return switch (byte) {
-            0 => .immediate,
-            1 => .memory,
-            2 => .register,
-            3 => .indirect,
-            else => null,
-        };
-    }
-
     pub fn toByte(self: Self) u8 {
         return @intFromEnum(self);
     }
 };
 
+/// Wrapper that facilitates conversion from an InstructionSet + AddressingMode
+/// into a byte.
 pub const InstructionHeader = struct {
     value: u8,
 
