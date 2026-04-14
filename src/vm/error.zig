@@ -31,5 +31,5 @@ pub fn handleVmError(vm: *const VirtualMachine, err: VirtualError) !void {
         error.ReadError => "Read error",
     };
 
-    try vm.stderr.print("0x{x}: {s}.\n", .{ vm.pc, error_message });
+    try vm.stderr.print("0x{x}: {s}.\n", .{ vm.ip, error_message });
 }

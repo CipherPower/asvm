@@ -198,7 +198,7 @@ fn printInstructions(writer: *std.Io.Writer) !void {
         \\ - pop [register]                                     Pops a value from the stack into [0], can cause underflow.
         \\ - jmp [address]                                      Transfers execution to [0].
         \\ - cmp [register], [register | integer]               Compares [0] and [1], sets according flags.
-        \\ - jg [address]                                       Jumps to [0] if both zero and sign flags are not set
+        \\ - jg [address]                                       Jumps to [0] if both zero and sign flags are not set.
         \\ - jl [address]                                       Jumps to [0] if the sign flag is set.
         \\ - jz [address]                                       Jumps to [0] if zero flag is set.
         \\ - jnz [address]                                      Jumps to [0] if zero flag is not set.

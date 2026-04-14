@@ -12,7 +12,7 @@ const AddressingMode = instruction_set.AddressingMode;
 pub const MEMORY_SIZE: comptime_int = 65536;
 pub const MAX_REGISTERS: comptime_int = 16;
 
-/// Deconstructions an InstructionHeader into an individual instruction + addressing mode.
+/// deconstructs an InstructionHeader into an individual instruction + addressing mode.
 fn deconstructHeader(byte: u8) VirtualError!struct { InstructionSet, AddressingMode } {
     const instruction: u8 = byte >> 2;
     const mode: u8 = byte & 0b0000_0011;
@@ -37,7 +37,7 @@ pub fn truncateDword(comptime T: type, dword: i32) T {
 pub const VirtualMachine = struct {
     memory: []u8,
     registers: [MAX_REGISTERS]i32,
-    pc: u16,
+    ip: u16,
     sp: u16,
     flags: u8,
     running: bool,
@@ -97,7 +97,7 @@ pub const VirtualMachine = struct {
         return .{
             .memory = mem,
             .registers = [_]i32{0} ** 16,
-            .pc = 0,
+            .ip = 0,
             .sp = 0,
             .flags = 0,
             .running = false,
@@ -117,7 +117,7 @@ pub const VirtualMachine = struct {
 
         @memcpy(self.memory[0..bytecode.len], bytecode);
 
-        self.pc = std.mem.readInt(u16, self.memory[0..2], .little);
+        self.ip = std.mem.readInt(u16, self.memory[0..2], .little);
     }
 
     pub fn run(self: *Self) VirtualError!void {
@@ -152,23 +152,23 @@ pub const VirtualMachine = struct {
     // ========================================================================================
 
     pub fn fetchByte(self: *Self) VirtualError!u8 {
-        if (self.pc >= self.memory.len) return error.MemoryOutOfBounds;
-        const value: u8 = self.memory[self.pc];
-        self.pc +%= 1;
+        if (self.ip >= self.memory.len) return error.MemoryOutOfBounds;
+        const value: u8 = self.memory[self.ip];
+        self.ip +%= @sizeOf(u8);
         return value;
     }
 
     pub fn fetchWord(self: *Self) VirtualError!u16 {
-        if (self.pc >= self.memory.len - 1) return error.MemoryOutOfBounds;
-        const value: u16 = std.mem.readInt(u16, self.memory[self.pc..][0..2], .little);
-        self.pc +%= 2;
+        if (self.ip >= self.memory.len - 1) return error.MemoryOutOfBounds;
+        const value: u16 = std.mem.readInt(u16, self.memory[self.ip..][0..2], .little);
+        self.ip +%= @sizeOf(u16);
         return value;
     }
 
     pub fn fetchDword(self: *Self) VirtualError!i32 {
-        if (self.pc >= self.memory.len - 3) return error.MemoryOutOfBounds;
-        const value: i32 = std.mem.readInt(i32, self.memory[self.pc..][0..4], .little);
-        self.pc +%= 4;
+        if (self.ip >= self.memory.len - 3) return error.MemoryOutOfBounds;
+        const value: i32 = std.mem.readInt(i32, self.memory[self.ip..][0..4], .little);
+        self.ip +%= @sizeOf(i32);
         return value;
     }
 
@@ -260,7 +260,7 @@ pub const VirtualMachine = struct {
         const target_address: u16 = try self.fetchWord();
         if (target_address >= self.memory.len) return error.MemoryOutOfBounds;
 
-        self.pc = target_address;
+        self.ip = target_address;
     }
 
     fn handleAdd(self: *Self, mode: AddressingMode) VirtualError!void {
@@ -382,13 +382,13 @@ pub const VirtualMachine = struct {
     fn handleJz(self: *Self, mode: AddressingMode) VirtualError!void {
         if (mode != .memory) return error.InvalidAddressingMode;
         const target_address: u16 = try self.fetchWord();
-        if ((self.flags & FLAG_Z) != 0) self.pc = target_address;
+        if ((self.flags & FLAG_Z) != 0) self.ip = target_address;
     }
 
     fn handleJnz(self: *Self, mode: AddressingMode) VirtualError!void {
         if (mode != .memory) return error.InvalidAddressingMode;
         const target_address: u16 = try self.fetchWord();
-        if ((self.flags & FLAG_Z) == 0) self.pc = target_address;
+        if ((self.flags & FLAG_Z) == 0) self.ip = target_address;
     }
 
     fn handleJg(self: *Self, mode: AddressingMode) VirtualError!void {
@@ -398,26 +398,26 @@ pub const VirtualMachine = struct {
         const is_zero: bool = (self.flags & FLAG_Z) != 0;
         const is_signed: bool = (self.flags & FLAG_S) != 0;
 
-        if (!is_zero and !is_signed) self.pc = target_address;
+        if (!is_zero and !is_signed) self.ip = target_address;
     }
 
     fn handleJl(self: *Self, mode: AddressingMode) VirtualError!void {
         if (mode != .memory) return error.InvalidAddressingMode;
         const target_address: u16 = try self.fetchWord();
-        if ((self.flags & FLAG_S) != 0) self.pc = target_address;
+        if ((self.flags & FLAG_S) != 0) self.ip = target_address;
     }
 
     fn handleCall(self: *Self, mode: AddressingMode) VirtualError!void {
         if (mode != .memory) return error.InvalidAddressingMode;
         const target_address: u16 = try self.fetchWord();
-        try self.stackPushDword(@intCast(self.pc));
-        self.pc = target_address;
+        try self.stackPushDword(@intCast(self.ip));
+        self.ip = target_address;
     }
 
     fn handleRet(self: *Self, mode: AddressingMode) VirtualError!void {
         _ = mode;
         const return_address: i32 = try self.stackPopDword();
-        self.pc = truncateDword(u16, return_address);
+        self.ip = truncateDword(u16, return_address);
     }
 
     fn handleSyscall(self: *Self, mode: AddressingMode) VirtualError!void {

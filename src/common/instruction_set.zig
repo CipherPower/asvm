@@ -22,11 +22,11 @@ pub const InstructionSet = enum(u8) {
     sub,
     mul,
     div,
-    land, // logical and
+    land, // logical and, couldnt name it "and" due to it being a keyword
     not,
     xor,
     neg,
-    lor, // logical or
+    lor, // logical or, couldnt name it "or" due to it being a keyword
     syscall,
     ret,
     call,

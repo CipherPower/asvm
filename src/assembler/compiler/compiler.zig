@@ -304,7 +304,7 @@ pub const Compiler = struct {
         try self.output.appendSlice(self.allocator, bytes);
     }
 
-    /// Helper function for reseting a Compiler, allowing reuse.
+    /// Helper function for resetting a Compiler, allowing reuse.
     fn clear(self: *Self) void {
         self.output.clearRetainingCapacity();
         self.errors.clearRetainingCapacity();
